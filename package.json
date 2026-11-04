@@ -1,0 +1,6 @@
+{
+  "name": "adiak-bilet",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=20" }
+}

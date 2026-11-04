@@ -1,0 +1,5 @@
+__pycache__/
+.vercel/
+# real etalon cavablar (dərs vəsaitindən), repo-ya düşmür
+questions.js
+api/_data.js
