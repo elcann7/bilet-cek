@@ -177,7 +177,8 @@ def build_koica():
         if rid:
             q["ref"] = "\n\n".join(reads[rid]["text"]); q["refTitle"] = reads[rid]["title"]
         qs.append(q)
-    return qs, grammar
+    texts = [{"n": k, "title": v["title"], "text": "\n\n".join(v["text"])} for k, v in sorted(reads.items())]
+    return qs, grammar, texts
 
 
 def build_xdiak():
@@ -187,7 +188,7 @@ def build_xdiak():
     prompts = ps[i + 1:]
     assert len(prompts) == 25, len(prompts)
     qs = [{"n": k + 1, "q": p, "kind": "speaking", "group": "all", "set": "other", "src": "umumi", "answer": ""} for k, p in enumerate(prompts)]
-    koica, grammar = build_koica()
+    koica, grammar, texts = build_koica()
     qs = koica + qs
     return {
         "id": "xdiak",
@@ -208,7 +209,7 @@ def build_xdiak():
         ],
         "limit": 240,
         "sets": [
-            {"id": "koica", "label": "Elementary · Koica (2026, 1 semestr)", "level": "elementary", "grammar": grammar},
+            {"id": "koica", "label": "Elementary · Koica (2026, 1 semestr)", "level": "elementary", "grammar": grammar, "texts": texts},
             {"id": "other", "label": "Digər qrup (ayrı sual siyahısı)", "level": None},
         ],
         "ticket": ["all"],
@@ -223,7 +224,7 @@ for _s in SUBJECTS:
 (HERE / "subjects.js").write_text("window.SUBJECTS = " + json.dumps(SUBJECTS, ensure_ascii=False, indent=1) + ";\n", encoding="utf-8")
 api = HERE / "api"
 api.mkdir(exist_ok=True)
-slim = {s["id"]: {"short": s["short"], "name": s["name"], "lang": s["lang"], "levels": s.get("levels", []), "q": {q["n"]: {k: q[k] for k in ("n", "q", "kind", "src", "answer")} for q in s["questions"]}} for s in SUBJECTS}
+slim = {s["id"]: {"short": s["short"], "name": s["name"], "lang": s["lang"], "levels": s.get("levels", []), "sets": [{"id": x["id"], "grammar": x.get("grammar", [])} for x in s.get("sets", [])], "q": {q["n"]: {k: q[k] for k in ("n", "q", "kind", "src", "answer")} for q in s["questions"]}} for s in SUBJECTS}
 (api / "_data.js").write_text("export default " + json.dumps(slim, ensure_ascii=False) + ";\n", encoding="utf-8")
 for s in SUBJECTS:
     print(s["id"], len(s["questions"]), "sual", {k: sum(1 for q in s["questions"] if q["src"] == k) for k in {q["src"] for q in s["questions"]}})

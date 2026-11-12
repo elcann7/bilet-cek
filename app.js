@@ -120,7 +120,7 @@
         const k = sampleKey(q), list = samples[k] || (samples[k] = []);
         const old = btn.textContent; btn.disabled = true; btn.textContent = "Yazılır…";
         try {
-          const r = await api(`s=${subjectId}&n=${q.n}&kind=sample&lv=${levelOf() ? levelOf().id : ""}&v=${list.length + 1}`, "", "text/plain", settings());
+          const r = await api(`s=${subjectId}&n=${q.n}&kind=sample&lv=${levelOf() ? levelOf().id : ""}&st=${curSetId() || ""}&v=${list.length + 1}`, "", "text/plain", settings());
           list.push(r);
           btn.closest(".sample").querySelector(".sample-body").innerHTML = sampleHtml(q);
           btn.textContent = "Başqa nümunə yarat";
@@ -335,7 +335,8 @@
                 <select id="level">${sub.levels.map((l) => `<option value="${l.id}" ${levelOf().id === l.id ? "selected" : ""}>${esc(l.label)}</option>`).join("")}</select>
                 <small>Cavabın bu səviyyəyə görə qiymətləndirilir: səviyyəndən yuxarı söz və qrammatika tələb olunmur, amma leksik və qrammatik səhvlər sayılır.</small>
               </label>` : ""}
-            ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.grammar && st.grammar.length ? `<details style="margin:0 0 18px"><summary class="small">Müəllimin qrammatika mövzuları (${st.grammar.length})</summary><ul class="small" style="margin:8px 0 0">${st.grammar.map((g) => `<li>${esc(g)}</li>`).join("")}</ul></details>` : ""; })()}
+            ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.grammar && st.grammar.length ? `<details style="margin:0 0 18px"><summary class="small">Qrammatika mövzuları (${st.grammar.length}): cavabında bunlar yoxlanır</summary><ul class="small" style="margin:8px 0 0">${st.grammar.map((g) => `<li>${esc(g)}</li>`).join("")}</ul></details>` : ""; })()}
+            ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.texts && st.texts.length ? `<details style="margin:0 0 18px"><summary class="small">Müəllimin nümunə mətnləri (${st.texts.length}): necə danışmaq lazımdır</summary><div style="margin-top:8px">${st.texts.map((t) => `<details class="bank-item"><summary><span class="qn" style="font-family:var(--serif);font-weight:700;color:var(--accent)">${t.n}.</span><span>${esc(t.title)}</span><span class="tag">${t.text.split(/\s+/).length} söz</span></summary><div class="ref">${md(t.text)}</div></details>`).join("")}</div></details>` : ""; })()}
             <div class="row">
               <button class="btn accent" id="start">Bilet çək</button>
               <button class="btn ghost" data-v="bank">Bütün suallar</button>
@@ -867,7 +868,7 @@
     }
   }
 
-  const lvQ = () => (levelOf() ? `&lv=${levelOf().id}` : "");
+  const lvQ = () => (levelOf() ? `&lv=${levelOf().id}` : "") + (curSetId() ? `&st=${curSetId()}` : "");
   async function gradeOne(q, answer, s) {
     if (answer && answer.kind === "skip") return { skipped: true, transcript: "", score: 0, covered: [], missed: [], feedback: "", speech: "" };
     if (!answer) return { transcript: "", score: 0, covered: [], missed: ["Cavab verilmədi"], feedback: "Bu suala cavab verilmədi.", speech: "" };
