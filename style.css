@@ -247,3 +247,6 @@ summary { cursor: pointer; color: var(--ink-2); font-size: 14px; font-weight: 50
 .corrected { border-left: 3px solid var(--green); background: #eef3ee; border-radius: 0 var(--radius) var(--radius) 0; padding: 12px 16px; }
 .corrected h4 { margin: 0 0 6px; font-family: var(--serif); font-size: 16px; color: var(--green); }
 .corrected .ref { padding: 0; }
+
+.ref.official { border-left: 3px solid var(--accent); padding-left: 14px; margin-bottom: 4px; }
+.ref.official h4 { font-family: var(--serif); font-size: 15px; color: var(--accent); }

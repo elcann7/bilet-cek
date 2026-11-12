@@ -142,13 +142,53 @@ def build_fizika():
 
 
 # ---------------------------------------------------------------- XDİAK
+KOICA = KOL / "Koica - Elementary Kollokvium ( 2026) (1 semestr) (1).docx"
+# Müəllimin faylındakı oxşar mövzu mətni (nümunə kimi göstərilir): speaking sualı → "N) Başlıq"
+READ_MAP = {
+    "describe your best friend.": 6,
+    "describe your family.": 10,
+    "describe a person in your family you admire the most.": 10,
+    "describe your favourite food.": 3,
+    "describe what you usually do in your free time.": 7,
+    "what are your biggest dreams for the future?": 19,
+}
+
+
+def build_koica():
+    """Müəllimin rəsmi Elementary faylı: Reading mətnləri, Grammar mövzuları, Speaking sualları."""
+    ps = [clean(p.text) for p in docx.Document(KOICA).paragraphs if clean(p.text)]
+    r0, g0, s0 = ps.index("Reading"), ps.index("Grammar Topics"), ps.index("Speaking")
+    reads, cur = {}, None
+    for t in ps[r0 + 1:g0]:
+        m = re.match(r"^(\d+)\) (.+)$", t)
+        if m:
+            cur = int(m.group(1)); reads[cur] = {"title": m.group(2).strip(" ."), "text": []}
+        elif cur:
+            reads[cur]["text"].append(t)
+    grammar = ps[g0 + 1:s0]
+    seen, prompts = set(), []
+    for t in ps[s0 + 1:]:
+        if t.lower() not in seen:          # "Describe your best friend." faylda iki dəfə yazılıb
+            seen.add(t.lower()); prompts.append(t)
+    qs = []
+    for k, p in enumerate(prompts):
+        q = {"n": 201 + k, "q": p, "kind": "speaking", "group": "all", "set": "koica", "src": "umumi", "answer": ""}
+        rid = READ_MAP.get(p.lower())
+        if rid:
+            q["ref"] = "\n\n".join(reads[rid]["text"]); q["refTitle"] = reads[rid]["title"]
+        qs.append(q)
+    return qs, grammar
+
+
 def build_xdiak():
     d = docx.Document(KOL / "XDİAK kollekvium sualları.docx")
     ps = [clean(p.text) for p in d.paragraphs if clean(p.text)]
     i = ps.index("Speaking")
     prompts = ps[i + 1:]
     assert len(prompts) == 25, len(prompts)
-    qs = [{"n": k + 1, "q": p, "kind": "speaking", "group": "all", "src": "umumi", "answer": ""} for k, p in enumerate(prompts)]
+    qs = [{"n": k + 1, "q": p, "kind": "speaking", "group": "all", "set": "other", "src": "umumi", "answer": ""} for k, p in enumerate(prompts)]
+    koica, grammar = build_koica()
+    qs = koica + qs
     return {
         "id": "xdiak",
         "short": "XDİAK",
@@ -167,8 +207,12 @@ def build_xdiak():
              "desc": "accurate, varied grammar, wide vocabulary, idiomatic and precise word choice, natural linking and development of ideas. Errors in basic grammar weigh heavily; expect precise lexis."},
         ],
         "limit": 240,
+        "sets": [
+            {"id": "koica", "label": "Elementary · Koica (2026, 1 semestr)", "level": "elementary", "grammar": grammar},
+            {"id": "other", "label": "Digər qrup (ayrı sual siyahısı)", "level": None},
+        ],
         "ticket": ["all"],
-        "ticketNote": "Speaking: 25 mövzudan 1-i düşür və ona uzun, ətraflı cavab verirsən (2–4 dəqiqə). İngilis dilində danışırsan.",
+        "ticketNote": "Speaking: siyahıdan 1 sual düşür və ona uzun, ətraflı cavab verirsən (2–4 dəqiqə). İngilis dilində danışırsan.",
         "questions": qs,
     }
 

@@ -14,6 +14,9 @@
   }
   let subjectId = null;                                   // seçilmiş fənn
   const S = () => SUBJECTS.find((x) => x.id === subjectId);
+  // fənnin bir neçə sual siyahısı (qrup) ola bilər: XDİAK-da hər qrupun müəllimi öz siyahısını verir
+  const curSetId = (sub) => { sub = sub || S(); if (!sub.sets) return null; const v = store.get("set:" + sub.id, null); return sub.sets.some((x) => x.id === v) ? v : sub.sets[0].id; };
+  const qsOf = (sub) => { sub = sub || S(); return sub.sets ? sub.questions.filter((q) => q.set === curSetId(sub)) : sub.questions; };
   const byNCache = {};
   const qOf = (n) => (byNCache[subjectId] || (byNCache[subjectId] = Object.fromEntries(S().questions.map((q) => [q.n, q]))))[n];
   const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll" };
@@ -82,7 +85,8 @@
   const history = () => store.get("history:" + currentProfile() + ":" + subjectId, []);
   const setHistory = (h) => store.set("history:" + currentProfile() + ":" + subjectId, h);
   // XDİAK kimi fənlərdə qruplar fərqli səviyyədə oxuyur: səviyyə fənnə görə saxlanır
-  const levelOf = () => { const lv = (S().levels || []); return lv.length ? (lv.find((l) => l.id === store.get("level:" + subjectId, null)) || lv[0]) : null; };
+  const fixedLevelId = () => { const sub = S(); const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.level ? st.level : null; };   // qrupun səviyyəsi sabitdirsə
+  const levelOf = () => { const lv = (S().levels || []); return lv.length ? (lv.find((l) => l.id === (fixedLevelId() || store.get("level:" + subjectId, null))) || lv[0]) : null; };
   const historyCount = (pid) => SUBJECTS.reduce((a, x) => a + store.get("history:" + pid + ":" + x.id, []).length, 0);
 
   // ---------- köməkçilər ----------
@@ -98,9 +102,10 @@
   const sampleHtml = (q) => {
     const list = samples[sampleKey(q)] || [];
     const cur = list[list.length - 1];
-    return cur
+    const official = q.ref ? `<div class="ref official"><h4 style="margin:0 0 6px">Müəllimin faylındakı oxşar mətn: ${esc(q.refTitle || "")}</h4>${md(q.ref)}</div>` : "";
+    return official + (cur
       ? `<div class="ref">${md(cur.sample)}${cur.phrases && cur.phrases.length ? `<h4 style="margin:14px 0 6px">Faydalı ifadələr</h4><ul>${cur.phrases.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<p class="muted small" style="margin:10px 0 0">Nümunə ${list.length} · ${esc(levelOf() ? levelOf().label : "")}. Əzbərləmə, strukturu və ifadələri götür.</p></div>`
-      : `<p class="muted small" style="margin:0">Hələ nümunə yoxdur. Düyməyə bas, süni intellekt səviyyənə uyğun nümunə cavab yazsın (${esc(levelOf() ? levelOf().label : "")}).</p>`;
+      : `<p class="muted small" style="margin:${q.ref ? "10px 0 0" : "0"}">${q.ref ? "İstəsən, süni intellekt bu mövzuda səviyyənə uyğun başqa nümunə də yaza bilər." : "Hələ nümunə yoxdur. Düyməyə bas, süni intellekt səviyyənə uyğun nümunə cavab yazsın"} (${esc(levelOf() ? levelOf().label : "")}).</p>`);
   };
   const sampleBlock = (q) => `
     <details class="sample" data-n="${q.n}"><summary>Nümunə cavab (səviyyənə görə)</summary>
@@ -293,7 +298,7 @@
               <button class="subject card" data-sub="${x.id}">
                 <span class="subject-tag">${esc(x.short)}</span>
                 <b class="subject-name">${esc(x.name)}</b>
-                <span class="muted small">${x.questions.length} sual · ${esc(x.exam)}</span>
+                <span class="muted small">${qsOf(x).length} sual · ${esc(x.exam)}</span>
                 <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 20}` : "Hələ bilet çəkməmisən"}</span>
               </button>`;
             }).join("")}
@@ -303,7 +308,7 @@
     },
 
     home() {
-      const sub = S(), N = sub.questions.length;
+      const sub = S(), N = qsOf(sub).length;
       const h = history();
       const best = h.length ? one(pts(Math.max(...h.map(examScore)))) : null;
       const avg = h.length ? one(pts(h.reduce((a, x) => a + examScore(x), 0) / h.length)) : null;
@@ -320,11 +325,17 @@
               <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(limitFor(s))}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
               <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir."}</li>
             </ol>
-            ${(sub.levels || []).length ? `
+            ${sub.sets ? `
+              <label class="field" style="max-width:420px;margin:0 0 14px"><span>Qrupun sual siyahısı</span>
+                <select id="setsel">${sub.sets.map((x) => `<option value="${x.id}" ${curSetId(sub) === x.id ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select>
+                <small>Müəllimin verdiyi siyahını seç. Suallar və səviyyə ona görə dəyişir.</small>
+              </label>` : ""}
+            ${(sub.levels || []).length && !fixedLevelId() ? `
               <label class="field" style="max-width:360px;margin:0 0 18px"><span>Qrupunun səviyyəsi</span>
                 <select id="level">${sub.levels.map((l) => `<option value="${l.id}" ${levelOf().id === l.id ? "selected" : ""}>${esc(l.label)}</option>`).join("")}</select>
                 <small>Cavabın bu səviyyəyə görə qiymətləndirilir: səviyyəndən yuxarı söz və qrammatika tələb olunmur, amma leksik və qrammatik səhvlər sayılır.</small>
               </label>` : ""}
+            ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.grammar && st.grammar.length ? `<details style="margin:0 0 18px"><summary class="small">Müəllimin qrammatika mövzuları (${st.grammar.length})</summary><ul class="small" style="margin:8px 0 0">${st.grammar.map((g) => `<li>${esc(g)}</li>`).join("")}</ul></details>` : ""; })()}
             <div class="row">
               <button class="btn accent" id="start">Bilet çək</button>
               <button class="btn ghost" data-v="bank">Bütün suallar</button>
@@ -344,6 +355,8 @@
           </div>
         </section>`;
       $app.querySelector("#start").onclick = () => go("draw");
+      const setSel = $app.querySelector("#setsel");
+      if (setSel) setSel.onchange = () => { store.set("set:" + subjectId, setSel.value); go("home"); };
       const lvSel = $app.querySelector("#level");
       if (lvSel) lvSel.onchange = () => store.set("level:" + subjectId, lvSel.value);
       $app.querySelectorAll("[data-v]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); go(el.dataset.v); }));
@@ -351,7 +364,7 @@
 
     draw() {
       const s = settings();
-      const pool = shuffle(Array.from({ length: Math.max(S().questions.length, 10) }, (_, i) => i + 1)).slice(0, 10);
+      const pool = shuffle(Array.from({ length: Math.max(qsOf().length, 10) }, (_, i) => i + 1)).slice(0, 10);
       $app.innerHTML = `
         <section class="fade-in">
           <h2>Bileti seç</h2>
@@ -617,14 +630,14 @@
       $app.innerHTML = `
         <section class="fade-in">
           <h2>Bütün suallar</h2>
-          <p class="muted">${S().questions.length} sual${S().questions.some((q) => q.answer) ? " və etalon cavablar" : ""}. Rəqəm həmin suala son cavabının keyfiyyətidir (0–10).</p>
+          <p class="muted">${qsOf().length} sual${qsOf().some((q) => q.answer) ? " və etalon cavablar" : ""}. Rəqəm həmin suala son cavabının keyfiyyətidir (0–10).</p>
           <input type="text" class="search" id="q" placeholder="Axtar: məs. etiket, sənəd, təqdimat…">
           <div id="list"></div>
         </section>`;
       const list = $app.querySelector("#list");
       const render = (term) => {
         const t = term.trim().toLocaleLowerCase("az");
-        list.innerHTML = S().questions.filter((q) => !t || (q.q + " " + q.answer).toLocaleLowerCase("az").includes(t)).map((q) => `
+        list.innerHTML = qsOf().filter((q) => !t || (q.q + " " + q.answer).toLocaleLowerCase("az").includes(t)).map((q) => `
           <details class="bank-item">
             <summary>
               <span class="qn" style="font-family:var(--serif);font-weight:700;color:var(--accent)">${q.n}.</span>
@@ -709,7 +722,7 @@
 
   function pickQuestions(mode) {
     const sub = S(), T = sub.ticket.length;
-    const all = sub.questions.map((q) => q.n);
+    const all = qsOf(sub).map((q) => q.n);
     if (mode === "random") return shuffle(all).slice(0, T).sort((a, b) => a - b);
     if (mode === "weak") {
       const last = lastScores();
@@ -723,7 +736,7 @@
       }
       return picked.sort((a, b) => a - b);
     }
-    return sub.ticket.map((g) => { const pool = sub.questions.filter((q) => q.group === g); return pool[rand(pool.length)].n; });
+    return sub.ticket.map((g) => { const pool = qsOf(sub).filter((q) => q.group === g); return pool[rand(pool.length)].n; });
   }
 
   function lastScores() {
