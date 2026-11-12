@@ -43,7 +43,7 @@ TASK ${q.n}: ${q.q}
 
 Do this:
 1. transcript: ${kind === "audio" ? "Transcribe the audio LITERALLY, word for word, in English, keeping the student's grammar and word-choice mistakes exactly as spoken (do not correct, smooth or complete anything; if a word was mispronounced so that it sounds like another word, write what was said and add [unclear] if unsure). If the recording is empty or unintelligible, say so." : "Return the student's text as it is, with all its mistakes."}
-2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one, and a short but correct and relevant answer at an elementary level is fine.
+2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one. In this colloquium the student gets ONE speaking task and is expected to give a long, developed answer (about 2–4 minutes of speech, i.e. a full paragraph or more: explanation, reasons, examples). An answer that is much too short for this (for example only 3–4 simple sentences) must lose points under task fulfilment and development, even if it is correct; what counts as long enough is judged by the level (elementary: about 10 simple sentences are enough).
 3. score (0–10): 9–10 = answers fully, well organised, few minor errors; 7–8 = answers clearly, some errors that do not block meaning; 5–6 = understandable but simple or with frequent errors; 3–4 = very limited, hard to follow; 1–2 = a few words/phrases; 0 = no answer or off-topic.
 4. covered: what the student did well (short phrases, in Azerbaijani). missed: the mistakes found in the transcript, at most 8, most important first, each in the form: "[qrammatika] dedin: ... → düzgünü: ..." or "[leksika] dedin: ... → düzgünü: ..." (quote the student's exact words, give the correct English, add a very short explanation in Azerbaijani when needed). If there are no real mistakes, return an empty list.
 5. feedback: 2–3 sentences in Azerbaijani addressed to the student ("sən"): what was good and what to do to raise the score.
@@ -72,6 +72,28 @@ Tapşırıq:
 Bütün mətnlər Azərbaycan dilində olsun.`;
 };
 
+// Nümunə cavab (yalnız speaking): istifadəçinin səviyyəsinə uyğun, səhvsiz, təbii danışıq tərzində
+const SAMPLE_SCHEMA = {
+  type: "object",
+  properties: { sample: { type: "string" }, phrases: { type: "array", items: { type: "string" } } },
+  required: ["sample", "phrases"],
+};
+const WORDS = { elementary: "130–170", preint: "170–220", inter: "220–290", upper: "290–360" };
+const SAMPLE_PROMPT = (subj, q, level, v) => `You are an English teacher writing a MODEL ANSWER for a university speaking colloquium (course: "${subj.name}"). Students will read it to learn how such an answer sounds.
+
+SPEAKING TASK: ${q.q}
+
+STUDENT LEVEL: ${level ? `${level.label}. ${level.desc}` : "A2–B1"}
+
+Write the model answer exactly as a student of THIS level could realistically say it out loud in about 2–3 minutes (${WORDS[level && level.id] || "170–220"} words):
+- natural spoken English, first person, with simple linking words (first of all, because, for example, also, in conclusion);
+- use ONLY grammar and vocabulary appropriate for this level; no rare or C-level words for lower levels; absolutely no grammar or spelling mistakes;
+- a clear structure: short opening, 2–3 developed ideas with reasons and a personal example each, short closing;
+- answer the task directly; do not invent facts that sound unrealistic.
+${v > 1 ? `This is variation #${v}: choose a DIFFERENT angle, different examples and different opening than a typical first answer.` : ""}
+
+Return JSON: "sample" = the model answer as plain text (paragraphs separated by a blank line); "phrases" = 5–6 useful phrases or structures taken from the answer, each in the form "English phrase — qısa Azərbaycan tərcüməsi".`;
+
 const json = (status, obj) => new Response(JSON.stringify(obj), {
   status,
   headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
@@ -79,7 +101,7 @@ const json = (status, obj) => new Response(JSON.stringify(obj), {
 
 const cleanKey = (k) => String(k || "").replace(/[^\x21-\x7e]/g, "");
 
-async function callGemini(key, parts, schema) {
+async function callGemini(key, parts, schema, temperature = 0.2) {
   let last = { status: 502, error: "Model cavab vermədi" };
   for (const model of MODELS) {
     const ctl = new AbortController();
@@ -91,7 +113,7 @@ async function callGemini(key, parts, schema) {
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify({
           contents: [{ role: "user", parts }],
-          generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, temperature: 0.2 },
+          generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema, temperature },
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -133,7 +155,15 @@ export async function POST(request) {
   const kind = url.searchParams.get("kind");
   const subj = DATA[url.searchParams.get("s") || "adiak"]; // köhnə müştərilər fənn göndərmir: ADİAK
   const q = subj && subj.q[n];
-  if (!q || !["audio", "text"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
+  if (!q || !["audio", "text", "sample"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
+
+  if (kind === "sample") {
+    if (q.kind !== "speaking") return json(400, { error: "Nümunə cavab yalnız speaking üçündür" });
+    const lv = (subj.levels || []).find((l) => l.id === url.searchParams.get("lv")) || (subj.levels || [])[0];
+    const v = Math.max(1, Math.min(20, Number(url.searchParams.get("v")) || 1));
+    const rs = await callGemini(key, [{ text: SAMPLE_PROMPT(subj, q, lv, v) }], SAMPLE_SCHEMA, 0.9);
+    return rs.ok ? json(200, rs.ok) : json(rs.status, { error: rs.error });
+  }
 
   const len = Number(request.headers.get("content-length") || 0);
   if (len > MAX_BYTES) return json(413, { error: "Səs yazısı çox böyükdür" });

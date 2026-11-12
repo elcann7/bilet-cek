@@ -147,9 +147,8 @@ def build_xdiak():
     ps = [clean(p.text) for p in d.paragraphs if clean(p.text)]
     i = ps.index("Speaking")
     prompts = ps[i + 1:]
-    groups = ["places"] * 10 + ["help"] * 8 + ["senses"] * 6 + ["places"]
-    assert len(prompts) == len(groups) == 25, len(prompts)
-    qs = [{"n": k + 1, "q": p, "kind": "speaking", "group": g, "src": "umumi", "answer": ""} for k, (p, g) in enumerate(zip(prompts, groups))]
+    assert len(prompts) == 25, len(prompts)
+    qs = [{"n": k + 1, "q": p, "kind": "speaking", "group": "all", "src": "umumi", "answer": ""} for k, p in enumerate(prompts)]
     return {
         "id": "xdiak",
         "short": "XDİAK",
@@ -167,8 +166,9 @@ def build_xdiak():
             {"id": "upper", "label": "Upper-Intermediate and above (B2–C1)",
              "desc": "accurate, varied grammar, wide vocabulary, idiomatic and precise word choice, natural linking and development of ideas. Errors in basic grammar weigh heavily; expect precise lexis."},
         ],
-        "ticket": ["places", "help", "senses"],
-        "ticketNote": "Speaking: 25 mövzudan 3-ü düşür (yer və səyahət, kömək, hisslər). İngilis dilində cavab verirsən.",
+        "limit": 240,
+        "ticket": ["all"],
+        "ticketNote": "Speaking: 25 mövzudan 1-i düşür və ona uzun, ətraflı cavab verirsən (2–4 dəqiqə). İngilis dilində danışırsan.",
         "questions": qs,
     }
 

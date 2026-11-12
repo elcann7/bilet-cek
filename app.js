@@ -56,6 +56,8 @@
     s.limit = Math.min(s.limit, 240); // server limiti: ən çox 4 dəqiqə
     return s;
   };
+  // uzun cavab tələb edən fənlərdə (XDİAK) limit fənnin minimumundan az ola bilməz
+  const limitFor = (s) => Math.max(s.limit, (S() && S().limit) || 0);
   const saveSettings = (s) => store.set("settings", s);
 
   // Profillər: eyni cihazda bir neçə nəfər işləsə, nəticələr ada görə ayrı saxlanır
@@ -90,6 +92,38 @@
   const refBody = (q) => q.images && q.images.length
     ? `<div class="ref shots">${q.images.map((u) => `<img src="${u}" alt="Etalon cavab səhifəsi" loading="lazy">`).join("")}</div>`
     : `<div class="ref">${md(q.answer)}</div>`;
+  // XDİAK: səviyyəyə uyğun nümunə cavab. İstifadəçi başqa nümunə də yarada bilər (Gemini ilə).
+  const samples = {};                                   // "fənn:sual:səviyyə" → [{sample, phrases}]
+  const sampleKey = (q) => `${subjectId}:${q.n}:${levelOf() ? levelOf().id : ""}`;
+  const sampleHtml = (q) => {
+    const list = samples[sampleKey(q)] || [];
+    const cur = list[list.length - 1];
+    return cur
+      ? `<div class="ref">${md(cur.sample)}${cur.phrases && cur.phrases.length ? `<h4 style="margin:14px 0 6px">Faydalı ifadələr</h4><ul>${cur.phrases.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<p class="muted small" style="margin:10px 0 0">Nümunə ${list.length} · ${esc(levelOf() ? levelOf().label : "")}. Əzbərləmə, strukturu və ifadələri götür.</p></div>`
+      : `<p class="muted small" style="margin:0">Hələ nümunə yoxdur. Düyməyə bas, süni intellekt səviyyənə uyğun nümunə cavab yazsın (${esc(levelOf() ? levelOf().label : "")}).</p>`;
+  };
+  const sampleBlock = (q) => `
+    <details class="sample" data-n="${q.n}"><summary>Nümunə cavab (səviyyənə görə)</summary>
+      <div class="sample-body">${sampleHtml(q)}</div>
+      <div class="row" style="margin-top:12px"><button class="btn ghost" data-sample="${q.n}">${(samples[sampleKey(q)] || []).length ? "Başqa nümunə yarat" : "Nümunə cavab yarat"}</button></div>
+    </details>`;
+  function bindSamples(root) {
+    root.querySelectorAll("[data-sample]").forEach((btn) => {
+      btn.onclick = async () => {
+        if (needKey()) { toast("Nümunə üçün əvvəlcə Gemini açarı əlavə et (Ayarlar)."); return; }
+        const q = qOf(Number(btn.dataset.sample));
+        const k = sampleKey(q), list = samples[k] || (samples[k] = []);
+        const old = btn.textContent; btn.disabled = true; btn.textContent = "Yazılır…";
+        try {
+          const r = await api(`s=${subjectId}&n=${q.n}&kind=sample&lv=${levelOf() ? levelOf().id : ""}&v=${list.length + 1}`, "", "text/plain", settings());
+          list.push(r);
+          btn.closest(".sample").querySelector(".sample-body").innerHTML = sampleHtml(q);
+          btn.textContent = "Başqa nümunə yarat";
+        } catch (e) { toast("Xəta: " + e.message); btn.textContent = old; }
+        finally { btn.disabled = false; }
+      };
+    });
+  }
   const mmss = (sec) => { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; };
   const rand = (n) => Math.floor(Math.random() * n);
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -282,7 +316,7 @@
             <ol class="steps">
               <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
-              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(s.limit)}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
+              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(limitFor(s))}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
               <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir."}</li>
             </ol>
             ${(sub.levels || []).length ? `
@@ -374,7 +408,7 @@
       const s = settings();
       const q = qOf(exam.qs[i]);
       const last = i === exam.qs.length - 1;
-      const hint = { problem: "Məsələni addım-addım həll et: düsturu, əvəzləməni və son cavabı (ölçü vahidi ilə) de.", speaking: levelOf() ? `Cavabı ingilis dilində ver. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində ver.", theory: "" }[q.kind] || "";
+      const hint = { problem: "Məsələni addım-addım həll et: düsturu, əvəzləməni və son cavabı (ölçü vahidi ilə) de.", speaking: levelOf() ? `Cavabı ingilis dilində, uzun və ətraflı ver (2–4 dəqiqə danış və ya bir neçə abzas yaz): fikrini izah et, səbəb və nümunə gətir. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində, uzun və ətraflı ver.", theory: "" }[q.kind] || "";
       $app.innerHTML = `
         <section class="fade-in stack">
           ${paper(i)}
@@ -426,14 +460,14 @@
             <button class="mic" id="mic" aria-label="Danışmağa başla">${MIC_SVG}</button>
             <div style="width:100%">
               <p id="rec-label" style="margin:0 0 4px;font-weight:500">Danışmağa başla</p>
-              <p class="muted small" id="rec-sub" style="margin:0 0 10px">Düyməyə bas və suala şifahi cavab ver. Limit: ${mmss(s.limit)}.</p>
+              <p class="muted small" id="rec-sub" style="margin:0 0 10px">Düyməyə bas və suala şifahi cavab ver. Limit: ${mmss(limitFor(s))}.</p>
               <div class="meter" id="meter">${"<i></i>".repeat(32)}</div>
             </div>
           </div>`;
         body.querySelector("#mic").onclick = async () => {
           if (rec) { rec.stop(); return; }
           try {
-            rec = await startRecording(s.limit, {
+            rec = await startRecording(limitFor(s), {
               meter: body.querySelector("#meter"),
               label: body.querySelector("#rec-label"),
               sub: body.querySelector("#rec-sub"),
@@ -529,7 +563,7 @@
               </div>
               ${it.speech ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
               <details><summary>Sənin cavabın (mətn)</summary><div class="transcript">${esc(it.transcript || "—")}</div></details>
-              ${q.kind === "speaking" ? "" : `<details><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
+              ${q.kind === "speaking" ? sampleBlock(q) : `<details><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
             </article>`;
           }).join("")}
           <div class="row">
@@ -538,6 +572,7 @@
           </div>
         </section>`;
       exam = null;
+      bindSamples($app);
       $app.querySelector("#again").onclick = () => go("draw");
       $app.querySelector("#home").onclick = () => go("home");
     },
@@ -564,8 +599,9 @@
                 ${q.kind === "speaking" ? `<span class="tag">speaking</span>` : `<span class="tag">${SRC[q.src]}</span>`}
               </span>
             </summary>
-            ${q.kind === "speaking" ? `<div class="ref"><p class="muted">Bu sual üçün etalon cavab yoxdur: sərbəst danışırsan. Qiymətləndirmə məzmun, qrammatika, lüğət və axıcılığa görədir.</p></div>` : refBody(q)}
+            ${q.kind === "speaking" ? `<div class="ref"><p class="muted small">Etalon cavab yoxdur: sərbəst danışırsan. Qiymətləndirmə məzmun, qrammatika, lüğət və axıcılığa görədir.</p>${sampleBlock(q)}</div>` : refBody(q)}
           </details>`).join("") || `<p class="muted">Heç nə tapılmadı.</p>`;
+        bindSamples(list);
       };
       $app.querySelector("#q").oninput = (e) => render(e.target.value);
       render("");
