@@ -2,7 +2,7 @@
 
 # Bilet Çək
 
-**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 10 ballıq qiymət al.**
+**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 20 ballıq kollokvium balı al.**
 
 [![Canlı sayt](https://img.shields.io/badge/canlı-bilet--cek.vercel.app-7a2a2a?style=flat-square)](https://bilet-cek.vercel.app)
 [![Gemini](https://img.shields.io/badge/AI-Gemini-4a4f57?style=flat-square)](https://aistudio.google.com)
@@ -30,7 +30,7 @@ Yeni fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
 - **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı, hər suala vaxt limiti.
 - **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı mətnə çevirir, həm qiymətləndirir. Brauzerin nitq tanıması işlədilmir (iPhone Safari Azərbaycan dilini tanımır).
 - **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
-- **10 ballıq sistem:** hər sual 0–10 qiymət alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı ortalamadır.
+- **Kollokvium 20 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamanın 20-yə çevrilməsidir. Fənn üzrə dəyişmək üçün `max` sahəsi var.
 - **Ətraflı rəy:** düzgün fikirlər, çatışmayanlar (ingilis dilində: səhvlər və düzəlişlər), nitq qeydi.
 - **Profillər, tarixçə, zəif suallar:** nəticələr fənnə görə ayrı saxlanır; "zəif suallara üstünlük" rejimi.
 - **Məxfilik:** nəticələr yalnız sənin brauzerindədir. Hər istifadəçi öz pulsuz Gemini açarını işlədir; açar kodda yoxdur.

@@ -100,7 +100,10 @@
     setTimeout(() => t.remove(), 3200);
   };
 
-  // Kollokvium cəmi 10 baldır: hər sual 0–10 keyfiyyətlə qiymətləndirilir, payı 1/sual sayıdır.
+  // Kollokvium cəmi 20 baldır (fənn üzrə dəyişə bilər: subject.max). Hər sual 0–10 keyfiyyətlə qiymətləndirilir,
+  // biletin balı keyfiyyətin ortalamasının 20-yə çevrilməsidir; hər sualın payı max / sual sayıdır.
+  const maxOf = () => (S() && S().max) || 20;
+  const pts = (q10) => (q10 / 10) * maxOf();                      // 0–10 keyfiyyət → kollokvium balı
   const one = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
   const examScore = (r) => r.total / r.items.length;            // 0–10 (dəqiq)
   const share = (score, count) => score / count;                // sualın 10 baldakı payı
@@ -250,13 +253,13 @@
           <div class="subjects">
             ${SUBJECTS.map((x) => {
               const h = store.get("history:" + currentProfile() + ":" + x.id, []);
-              const best = h.length ? one(Math.max(...h.map(examScore))) : null;
+              const best = h.length ? one((Math.max(...h.map(examScore)) / 10) * (x.max || 20)) : null;
               return `
               <button class="subject card" data-sub="${x.id}">
                 <span class="subject-tag">${esc(x.short)}</span>
                 <b class="subject-name">${esc(x.name)}</b>
                 <span class="muted small">${x.questions.length} sual · ${esc(x.exam)}</span>
-                <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/10` : "Hələ bilet çəkməmisən"}</span>
+                <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 20}` : "Hələ bilet çəkməmisən"}</span>
               </button>`;
             }).join("")}
           </div>
@@ -267,8 +270,8 @@
     home() {
       const sub = S(), N = sub.questions.length;
       const h = history();
-      const best = h.length ? one(Math.max(...h.map(examScore))) : null;
-      const avg = h.length ? one(h.reduce((a, x) => a + examScore(x), 0) / h.length) : null;
+      const best = h.length ? one(pts(Math.max(...h.map(examScore)))) : null;
+      const avg = h.length ? one(pts(h.reduce((a, x) => a + examScore(x), 0) / h.length)) : null;
       const covered = new Set(h.flatMap((x) => x.items.map((i) => i.n))).size;
       const s = settings();
       $app.innerHTML = `
@@ -280,7 +283,7 @@
               <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
               <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(s.limit)}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
-              <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və 10 ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və 10 ballıq kollokvium balı verir."}</li>
+              <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir."}</li>
             </ol>
             ${(sub.levels || []).length ? `
               <label class="field" style="max-width:360px;margin:0 0 18px"><span>Qrupunun səviyyəsi</span>
@@ -496,15 +499,15 @@
       $app.innerHTML = `
         <section class="fade-in stack">
           <div class="card verdict">
-            <div class="grade"><div><b>${Math.round(sc)}</b><span>10 baldan</span></div></div>
+            <div class="grade"><div><b>${one(pts(sc))}</b><span>${maxOf()} baldan</span></div></div>
             <div>
               <p class="muted small" style="margin:0">${esc(S().short)} · Bilet №${rec.ticket} · ${new Date(rec.date).toLocaleString("az-AZ")}</p>
-              <h2 style="margin:4px 0 12px">${esc(S().exam.split(" ·")[0])} balı: ${one(sc)} / 10</h2>
+              <h2 style="margin:4px 0 12px">${esc(S().exam.split(" ·")[0])} balı: ${one(pts(sc))} / ${maxOf()}</h2>
               ${rec.items.map((it, i) => `
                 <div class="scorebar" style="margin-bottom:6px">
                   <span class="small" style="min-width:64px">Sual ${i + 1}</span>
                   <div class="bar"><div style="width:${it.score * 10}%;background:${scoreColor(it.score)}"></div></div>
-                  <b>${one(share(it.score, n))}/${one(10 / n)}</b>
+                  <b>${one(pts(it.score) / n)}/${one(maxOf() / n)}</b>
                 </div>`).join("")}
             </div>
           </div>
@@ -517,7 +520,7 @@
                   <p class="muted small" style="margin:0">Sual ${i + 1} · №${it.n}</p>
                   <h3 style="margin:2px 0 0">${esc(q.q)}</h3>
                 </div>
-                <span class="pill" style="color:${scoreColor(it.score)}" title="Keyfiyyət: ${it.score}/10">${one(share(it.score, n))} / ${one(10 / n)}</span>
+                <span class="pill" style="color:${scoreColor(it.score)}" title="Keyfiyyət: ${it.score}/10">${one(pts(it.score) / n)} / ${one(maxOf() / n)}</span>
               </div>
               <p style="margin:0">${esc(it.feedback)}</p>
               <div class="cols">
@@ -577,7 +580,7 @@
           ${h.length ? h.map((r, idx) => {
             return `
             <div class="hist">
-              <span class="pill" style="color:${scoreColor(examScore(r))}">${one(examScore(r))} / 10</span>
+              <span class="pill" style="color:${scoreColor(examScore(r))}">${one(pts(examScore(r)))} / ${maxOf()}</span>
               <div>
                 <b>Bilet №${r.ticket}</b> <span class="muted small">· ${new Date(r.date).toLocaleString("az-AZ")}</span>
                 <div class="muted small">Suallar: ${r.items.map((i) => `№${i.n}`).join(", ")}</div>

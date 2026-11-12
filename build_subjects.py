@@ -174,6 +174,8 @@ def build_xdiak():
 
 
 SUBJECTS = [build_adiak(), build_fizika(), build_xdiak()]
+for _s in SUBJECTS:
+    _s.setdefault("max", 20)  # kollokvium cəmi 20 baldır
 (HERE / "subjects.js").write_text("window.SUBJECTS = " + json.dumps(SUBJECTS, ensure_ascii=False, indent=1) + ";\n", encoding="utf-8")
 api = HERE / "api"
 api.mkdir(exist_ok=True)
