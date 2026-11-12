@@ -6,8 +6,12 @@
 
   const NEW_HOST = "bilet-cek.vercel.app";
   const OLD_HOSTS = ["adiak-bilet.vercel.app", "biletcek.vercel.app"];
-  const SUBJECTS = window.SUBJECTS;
   const $app = document.getElementById("app");
+  const SUBJECTS = window.SUBJECTS;
+  if (!Array.isArray(SUBJECTS) || !SUBJECTS.length) {
+    $app.innerHTML = `<section class="card" style="max-width:520px;margin:40px auto"><h2>Fənn məlumatı yüklənmədi</h2><p class="muted">Səhifəni yenilə (Ctrl+F5). Problem davam edərsə, bir azdan yenidən cəhd et.</p></section>`;
+    return;
+  }
   let subjectId = null;                                   // seçilmiş fənn
   const S = () => SUBJECTS.find((x) => x.id === subjectId);
   const byNCache = {};
