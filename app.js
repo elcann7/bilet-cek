@@ -20,8 +20,8 @@
   const qsOf = (sub) => { sub = sub || S(); return sub.sets ? sub.questions.filter((q) => q.set === curSetId(sub)) : sub.questions; };
   const byNCache = {};
   const qOf = (n) => (byNCache[subjectId] || (byNCache[subjectId] = Object.fromEntries(S().questions.map((q) => [q.n, q]))))[n];
-  const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll", user: "sənin", muhazire: "mühazirə" };
-  const SRC_LONG = { vesait: "dərs vəsaitindən", kurs: "böyük kursların cavab faylından", umumi: "ümumi biliyə əsaslanır", hesab: "hesablanmış həll", user: "sənin yüklədiyin materialdan", muhazire: "müəllimin mühazirə slaydlarından" };
+  const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll", user: "sənin", muhazire: "mühazirə əsasında" };
+  const SRC_LONG = { vesait: "dərs vəsaitindən", kurs: "böyük kursların cavab faylından", umumi: "ümumi biliyə əsaslanır", hesab: "hesablanmış həll", user: "sənin yüklədiyin materialdan", muhazire: "müəllimin mühazirə materialına əsasən hazırlanıb" };
 
   // ---------- saxlama ----------
   const PREFIX = "biletcek.";

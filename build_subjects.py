@@ -63,52 +63,11 @@ def build_adiak():
 
 
 # ---------------------------------------------------------------- Fizika
-# Suallar: yalnız müəllimin rəsmi faylından (fizika kollek resmi.docx). Etalon cavablar: müəllimin mühazirə slaydlarından
-# (04-Fizika/Muhazireler). Böyük kursların PDF cavabları İSTİFADƏ EDİLMİR.
-# Rəsmi sual № → (mühazirə, slayd nömrələri). Mühazirə 3 (elektrostatika) faylı yoxdur: 14–19 etalonsuz qalır.
-LECT = Path(os.environ.get("LECTURES_DIR") or HOME / "OneDrive" / "Documents" / "AzTU-1-Semestr" / "04-Fizika" / "Muhazireler")
-LECT_FILES = {"m1": "Fizika - Giris ve movzular (51 slayd).pptx", "m2": "M02 - Molekulyar fizika ve termodinamika.pptx"}
-FIZ_SLIDES = {
-    1: ("m1", [11, 12, 21, 24, 25, 26, 28]),
-    2: ("m1", [6, 7, 13, 14, 15, 16, 18, 20, 21, 23]),
-    3: ("m1", [33, 34, 35, 36, 48]),
-    4: ("m1", [37, 38, 39, 40, 41, 42, 43, 44, 45, 47]),
-    5: ("m1", [28, 29, 30, 31, 32]),
-    6: ("m1", [25, 26, 27, 46]),
-    7: ("m2", [6, 7, 8, 9, 10, 11, 12]),
-    8: ("m2", [13, 14, 15, 16]),
-    9: ("m2", [17, 18, 19, 20, 21]),
-    10: ("m2", [22, 23]),
-    11: ("m2", [28, 29]),
-    12: ("m2", [32, 33, 34]),
-    13: ("m2", [24, 25, 26, 30, 31, 35]),
-}
-# Mühazirə 2-nin 22–37-ci slaydları tam şəkildir (mətn çıxmır): məzmunu slayddan oxuyub yazmışam
-FIZ_TEXT_FIX = {
-    10: """Sərbəstlik dərəcələrinin sayı (i): cismin fəzada vəziyyətini təyin edən müstəqil koordinatların sayı. Maddi nöqtə i=3, birnöqtəli molekul i=3, sərt ikiatomlu molekul i=5 (3 irəliləmə + 2 fırlanma), üç və çoxatomlu molekul i=6. Ümumi halda i = i_irəl + i_fırl + 2·i_rəqs.
-Enerjinin sərbəstlik dərəcələrinə görə bərabər paylanması (Bolsman) qanunu: termodinamik tarazlıqda hər bir sərbəstlik dərəcəsinə orta hesabla eyni enerji düşür: ε₁ = kT/2. Molekulun orta kinetik enerjisi ⟨ε⟩ = (i/2)·kT.""",
-    11: """Termodinamikada iş: porşenin altındakı qaz genişlənərkən görülən elementar iş dA = p·dV, qazın həcmi V₁-dən V₂-yə dəyişəndə A₁₂ = ∫p dV.
-İzobarik proses (p=const): A = p(V₂−V₁) = (m/M)·R(T₂−T₁). İzoxorik proses (V=const): iş görülmür, A=0. İzotermik proses (T=const): p = (m/M)RT/V əvəz edilir, A = (m/M)RT·ln(V₂/V₁) = (m/M)RT·ln(p₁/p₂). Adiabatik proses: A = −ΔU.""",
-    12: """İstilik tutumu: cismin 1 K qızdırmaq üçün lazım olan istilik miqdarı, C = dQ/dT. Xüsusi istilik tutumu c = dQ/(m·dT) (1 kq maddəni 1 K qızdırmaq üçün), molyar istilik tutumu C_m = dQ/(ν·dT) (1 mol maddə üçün), C_m = M·c.
-Sabit həcmdə C_V = (i/2)·R, sabit təzyiqdə C_p = ((i+2)/2)·R. Mayer düsturu: C_p − C_V = R. Adiabat əmsalı (Puasson əmsalı) γ = C_p/C_V = (i+2)/i.""",
-    13: """Termodinamikanın I qanunu: sistemə verilən istilik miqdarı (dQ) onun daxili enerjisinin dəyişməsinə (dU) və xarici qüvvələrə qarşı görülən işə (dA) sərf olunur: dQ = dU + dA. Daxili enerji U = (i/2)·(m/M)·R·T.
-İzoxorik proses: dA=0, dQ = dU. İzotermik proses: dU=0, dQ = dA. İzobarik proses: dQ = dU + p·dV. Adiabatik proses (istilik mübadiləsi yoxdur): dQ=0, dA = −dU; hal tənliyi (Puasson): p·V^γ = const, T·V^(γ−1) = const.
-Termodinamikanın II qanunu: istilik özbaşına soyuq cisimdən isti cismə keçə bilməz; bütün istilik mühərrikləri üçün f.i.ə. 1-dən kiçikdir; qapalı sistemdə entropiya azalmır. (Mühazirə slaydlarında II qanun yoxdur, bu hissəni müəllimdən dəqiqləşdir.)""",
-}
-
-
-def slide_texts(pptx_path, nums):
-    from pptx import Presentation
-    prs = Presentation(pptx_path)
-    out = []
-    for n in nums:
-        parts = []
-        for sh in prs.slides[n - 1].shapes:
-            if sh.has_text_frame and sh.text_frame.text.strip():
-                parts.append(clean(sh.text_frame.text))
-        if parts:
-            out.append(" ".join(parts))
-    return "\n\n".join(out)
+# Suallar: yalnız müəllimin rəsmi faylından (fizika kollek resmi.docx).
+# Etalon cavablar: müəllimin mühazirə materialına əsasən (mühazirə 1 və 2 slaydları) Claude tərəfindən yazılıb,
+# content/fizika-nezeri.txt faylındadır. Böyük kursların PDF-i və slayd şəkilləri istifadə edilmir.
+# Mühazirə 3 (elektrostatika, suallar 14–19) materialı yoxdur: bu cavablar ümumi fizika biliyinə əsasən yazılıb.
+NO_LECTURE = "\n\n**Qeyd:** bu cavab ümumi fizika biliyinə əsasən yazılıb, çünki müəllimin mühazirə 3 materialı əlimdə yoxdur. Mühazirə slaydı ilə tutuşdur."
 
 
 def build_fizika():
@@ -119,23 +78,18 @@ def build_fizika():
     theory, problems = items[:19], items[19:]
     assert len(theory) == 19 and len(problems) == 11, (len(theory), len(problems))
 
-    # köhnə (böyük kurs PDF) səhifə şəkillərini təmizlə, mühazirə slaydlarını şəklə çevir
-    for old in ANS.glob("fizika-p*.webp"):
+    for old in ANS.glob("fizika-*.webp"):   # köhnə PDF səhifə və slayd şəkilləri
         old.unlink()
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("render_slides", HERE / "content" / "render_slides.py")
-    rs = importlib.util.module_from_spec(spec); spec.loader.exec_module(rs)
-    for lec, nums in {k: sorted({n for kk, (l, ns) in FIZ_SLIDES.items() if l == k for n in ns}) for k in LECT_FILES}.items():
-        rs.render(LECT / LECT_FILES[lec], nums, ANS, f"fizika-{lec}-")
+    txt = (HERE / "content" / "fizika-nezeri.txt").read_text(encoding="utf-8")
+    answers = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"(?ms)^### (\d+)\n(.*?)(?=^### |\Z)", txt)}
+    assert sorted(answers) == list(range(1, 20)), sorted(answers)
 
     qs = []
     for i, t in enumerate(theory, 1):
-        if i in FIZ_SLIDES:
-            lec, nums = FIZ_SLIDES[i]
-            text = FIZ_TEXT_FIX.get(i) or slide_texts(LECT / LECT_FILES[lec], nums)
-            q = {"src": "muhazire", "answer": text, "images": [f"answers/fizika-{lec}-{n:02d}.webp" for n in nums]}
+        if i <= 13:
+            q = {"src": "muhazire", "answer": answers[i]}
         else:
-            q = {"src": "umumi", "answer": ""}  # mühazirə 3 (elektrostatika) faylı yoxdur
+            q = {"src": "umumi", "answer": answers[i] + NO_LECTURE}
         qs.append({"n": i, "q": t, "kind": "theory", "group": "a" if i <= 10 else "b", **q})
 
     sol = json.loads((HERE / "content" / "fizika-meseleler.json").read_text(encoding="utf-8"))

@@ -27,7 +27,7 @@ const SRC_LABEL = {
   kurs: "böyük kursların cavab faylından",
   umumi: "fənnin ümumi məzmunundan",
   hesab: "hesablanmış həll",
-  muhazire: "müəllimin mühazirə slaydlarından (rəsmi)",
+  muhazire: "müəllimin mühazirə materialına əsasən hazırlanmış",
   user: "istifadəçinin özü yüklədiyi material",
 };
 const LANG_NAME = { az: "Azərbaycan", en: "ingilis", ru: "rus", tr: "türk" };
