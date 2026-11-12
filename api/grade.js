@@ -27,7 +27,9 @@ const SRC_LABEL = {
   kurs: "böyük kursların cavab faylından",
   umumi: "fənnin ümumi məzmunundan",
   hesab: "hesablanmış həll",
+  user: "istifadəçinin özü yüklədiyi material",
 };
+const LANG_NAME = { az: "Azərbaycan", en: "ingilis", ru: "rus", tr: "türk" };
 
 const OUT_RULES = (kind) => `transcript: ${kind === "audio" ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : "Tələbənin mətnini olduğu kimi qaytar."}`;
 
@@ -58,14 +60,15 @@ Do this:
 Write covered/missed/feedback/speech in Azerbaijani; keep quoted English and the "corrected" text as English.`;
   }
   const problem = q.kind === "problem";
-  return `Sən Azərbaycan Texniki Universitetində "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.
+  const langNote = subj.lang && subj.lang !== "az" && LANG_NAME[subj.lang] ? ` Tələbə ${LANG_NAME[subj.lang]} dilində cavab verir; səs yazısını həmin dildə mətnə çevir.` : "";
+  return `Sən ${subj.custom ? "bir universitetdə" : "Azərbaycan Texniki Universitetində"} "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.${langNote}
 
 ${problem ? "MƏSƏLƏ" : "SUAL"} №${q.n}: ${q.q}
 
-${problem ? "DÜZGÜN HƏLL VƏ CAVAB" : "ETALON CAVAB"} (${SRC_LABEL[q.src] || "etalon"}):
+${q.answer ? `${problem ? "DÜZGÜN HƏLL VƏ CAVAB" : "ETALON CAVAB"} (${SRC_LABEL[q.src] || "etalon"}):
 """
 ${q.answer}
-"""
+"""` : `ETALON CAVAB VERİLMƏYİB. Cavabı öz fənn biliyinə görə qiymətləndir: yalnız əmin olduğun faktiki səhvləri "missed"-ə yaz. Əmin olmadığın yerdə bunu rəydə qeyd et və balı ehtiyatla ver.`}
 
 Tapşırıq:
 1. ${OUT_RULES(kind)}
@@ -103,6 +106,61 @@ Write the model answer exactly as a student of THIS level could realistically sa
 ${v > 1 ? `This is variation #${v}: choose a DIFFERENT angle, different examples and different opening than a typical first answer.` : ""}
 
 Return JSON: "sample" = the model answer as plain text (paragraphs separated by a blank line); "phrases" = 5–6 useful phrases or structures taken from the answer, each in the form "English phrase — qısa Azərbaycan tərcüməsi".`;
+
+// ---- istifadəçinin öz fənni: fayl/mətndən sualların çıxarılması, materialdan sual və etalon cavab yaradılması
+const PARSE_SCHEMA = {
+  type: "object",
+  properties: { questions: { type: "array", items: { type: "object", properties: { q: { type: "string" }, answer: { type: "string" }, kind: { type: "string", enum: ["theory", "problem", "speaking"] } }, required: ["q", "answer", "kind"] } } },
+  required: ["questions"],
+};
+const ANSWERS_SCHEMA = {
+  type: "object",
+  properties: { answers: { type: "array", items: { type: "object", properties: { i: { type: "integer" }, answer: { type: "string" } }, required: ["i", "answer"] } } },
+  required: ["answers"],
+};
+const EXTRACT_PROMPT = (text, hint) => `Below is a document uploaded by a university student. It contains a list of exam / colloquium questions (it may also contain headers, instructions, page numbers or answers).
+
+Extract the exam questions exactly as written, in the document's own language. Rules:
+- one entry per question; if a question has several sub-parts on consecutive lines that belong together, keep them in one entry;
+- ignore titles, instructions, group names, page numbers, signatures;
+- "answer": if the document itself gives the answer or solution to that question right after it, copy it; otherwise return an empty string. Never invent answers here;
+- "kind": "problem" for calculation/numeric tasks, "speaking" for tasks that ask the student to talk or write freely about a topic in English, otherwise "theory";
+- keep the original order and do not skip questions.${hint ? `\nThe student says about the document: ${hint}` : ""}
+
+DOCUMENT:
+"""
+${text}
+"""`;
+const GENERATE_PROMPT = (text, count, hint) => `Below is study material (lecture notes, textbook text) uploaded by a university student. Write ${count} exam questions that a teacher could realistically ask on this material, covering it evenly, ordered by topic. Write in the SAME language as the material. Each question must be self-contained.
+
+For each question return "answer": a model answer of 3–8 sentences based STRICTLY on the material (no outside facts), and "kind": "theory" (or "problem" if the material contains calculation tasks).${hint ? `\nThe student says about the material: ${hint}` : ""}
+
+MATERIAL:
+"""
+${text}
+"""`;
+const ANSWERS_PROMPT = (material, items) => `You are helping a university student prepare for an exam. For each question below, write a model answer of 3–8 sentences based STRICTLY on the MATERIAL. Write in the language of the question. If the material does not contain what is needed, start the answer with "(Materialda yoxdur) " and then give a brief answer from general knowledge.
+
+QUESTIONS:
+${items.map((x) => `${x.i}. ${x.q}`).join("\n")}
+
+MATERIAL:
+"""
+${material}
+"""
+
+Return JSON with "answers": [{"i": question number, "answer": text}] for every question.`;
+
+function fromCtx(request) {
+  let c;
+  try { c = JSON.parse(Buffer.from(request.headers.get("x-ctx") || "", "base64").toString("utf8")); } catch { return null; }
+  if (!c || typeof c.q !== "string" || !c.q.trim()) return null;
+  const kind = ["theory", "problem", "speaking"].includes(c.kind) ? c.kind : "theory";
+  return {
+    subj: { custom: true, short: "Custom", name: String(c.name || "Fənn").slice(0, 120), lang: String(c.lang || "az").slice(0, 3), levels: (DATA.xdiak && DATA.xdiak.levels) || [], sets: [] },
+    q: { n: Number(c.n) || 1, q: c.q.slice(0, 1500), kind, src: c.answer ? "user" : "umumi", answer: String(c.answer || "").slice(0, 4000) },
+  };
+}
 
 const json = (status, obj) => new Response(JSON.stringify(obj), {
   status,
@@ -161,10 +219,37 @@ export async function POST(request) {
     return r.ok ? json(200, { ok: true, own: !!request.headers.get("x-user-key") }) : json(r.status, { error: r.error });
   }
 
-  const n = Number(url.searchParams.get("n"));
   const kind = url.searchParams.get("kind");
-  const subj = DATA[url.searchParams.get("s") || "adiak"]; // köhnə müştərilər fənn göndərmir: ADİAK
-  const q = subj && subj.q[n];
+
+  if (kind === "parse" || kind === "answers") {
+    const raw = Buffer.from(await request.arrayBuffer());
+    if (!raw.length || raw.length > 400_000) return json(413, { error: "Mətn boşdur və ya çox böyükdür" });
+    let b;
+    try { b = JSON.parse(raw.toString("utf8")); } catch { return json(400, { error: "Yanlış sorğu" }); }
+    if (kind === "parse") {
+      const text = String(b.text || "").slice(0, 60000);
+      if (text.trim().length < 20) return json(400, { error: "Mətn çox qısadır" });
+      const hint = String(b.hint || "").slice(0, 300);
+      const count = Math.max(5, Math.min(40, Number(b.count) || 20));
+      const prompt = b.mode === "generate" ? GENERATE_PROMPT(text, count, hint) : EXTRACT_PROMPT(text, hint);
+      const r = await callGemini(key, [{ text: prompt }], PARSE_SCHEMA, b.mode === "generate" ? 0.5 : 0.1);
+      if (!r.ok) return json(r.status, { error: r.error });
+      const list = (r.ok.questions || []).map((x) => ({ q: String(x.q || "").trim().slice(0, 1500), answer: String(x.answer || "").trim().slice(0, 4000), kind: x.kind })).filter((x) => x.q.length > 3).slice(0, 100);
+      return json(200, { questions: list });
+    }
+    const material = String(b.material || "").slice(0, 40000);
+    const items = (Array.isArray(b.items) ? b.items : []).slice(0, 8).map((x) => ({ i: Number(x.i), q: String(x.q || "").slice(0, 1500) })).filter((x) => x.q);
+    if (material.trim().length < 30 || !items.length) return json(400, { error: "Material və ya sual yoxdur" });
+    const r = await callGemini(key, [{ text: ANSWERS_PROMPT(material, items) }], ANSWERS_SCHEMA, 0.2);
+    if (!r.ok) return json(r.status, { error: r.error });
+    return json(200, { answers: (r.ok.answers || []).map((x) => ({ i: Number(x.i), answer: String(x.answer || "").trim().slice(0, 4000) })) });
+  }
+
+  const n = Number(url.searchParams.get("n"));
+  const sid = url.searchParams.get("s") || "adiak"; // köhnə müştərilər fənn göndərmir: ADİAK
+  let subj, q;
+  if (sid.startsWith("u_")) { const c = fromCtx(request); if (c) { subj = c.subj; q = c.q; } }   // istifadəçinin öz fənni: sual başlıqla gəlir
+  else { subj = DATA[sid]; q = subj && subj.q[n]; }
   if (!q || !["audio", "text", "sample"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
 
   if (kind === "sample") {

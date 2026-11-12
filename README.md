@@ -23,7 +23,19 @@
 | **Fizika** | 19 nəzəri sual + 10 məsələ | yazılı (səslə də olar) | nəzəriyyədə etalonla, məsələdə düzgün həll və cavabla |
 | **XDİAK** (ingilis dili) | 25 speaking mövzusu | səslə (yazılı da olar) | qrupun **səviyyəsinə** görə: Elementary-dən Upper-Intermediate-ə; leksik və qrammatik səhvlər sayılır, səviyyədən yuxarı söz tələb olunmur |
 
-Yeni fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
+Yeni hazır fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
+
+## Öz sınağını yarat (başqa universitet, başqa fənn)
+
+Fənn seçimi ekranında **"Öz sınağını yarat"**: PDF, Word (.docx), .txt faylı yüklə və ya mətni yapışdır. Fayl **brauzerdə** oxunur. Sonra:
+
+- **Sualları tap:** süni intellekt sənədin içindən sualları çıxarır (başlıq, təlimat, səhifə nömrəsi atılır; fayldakı cavablar varsa götürülür).
+- **Hər sətir bir sual:** süni intellektsiz, sürətli yol.
+- **Materialdan sual yarat:** yalnız dərs mətnin varsa, ondan sual və etalon cavab yazılır.
+- **Etalon cavabları materialdan yarat:** cavabsız suallar üçün, yalnız sənin materialına əsaslanaraq (materialda olmayan "(Materialda yoxdur)" kimi işarələnir).
+- Siyahını redaktə et, bilet ölçüsünü (1–10 sual), maksimum balı (10–100), cavab dilini (az, en, ru, tr) və növü (nəzəri / məsələ / ingilis speaking) seç.
+
+Etalon cavab məcburi deyil: olmasa, süni intellekt öz fənn biliyinə görə yoxlayır. Fənlər **yalnız sənin brauzerində** saxlanılır (serverdə heç nə yoxdur); **Paylaş** düyməsi `.json` faylı verir, dostun "Dostun fənnini yüklə" ilə açır. Yüklənən fayllar təmizlənir (yalnız mətn, uzunluq limitləri).
 
 ## Xüsusiyyətlər
 

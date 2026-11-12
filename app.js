@@ -7,8 +7,9 @@
   const NEW_HOST = "bilet-cek.vercel.app";
   const OLD_HOSTS = ["adiak-bilet.vercel.app", "biletcek.vercel.app"];
   const $app = document.getElementById("app");
-  const SUBJECTS = window.SUBJECTS;
-  if (!Array.isArray(SUBJECTS) || !SUBJECTS.length) {
+  const BUILTIN = window.SUBJECTS;
+  let SUBJECTS = BUILTIN;                                  // + istifadəçinin öz fənləri (brauzerdə saxlanır)
+  if (!Array.isArray(BUILTIN) || !BUILTIN.length) {
     $app.innerHTML = `<section class="card" style="max-width:520px;margin:40px auto"><h2>Fənn məlumatı yüklənmədi</h2><p class="muted">Səhifəni yenilə (Ctrl+F5). Problem davam edərsə, bir azdan yenidən cəhd et.</p></section>`;
     return;
   }
@@ -19,8 +20,8 @@
   const qsOf = (sub) => { sub = sub || S(); return sub.sets ? sub.questions.filter((q) => q.set === curSetId(sub)) : sub.questions; };
   const byNCache = {};
   const qOf = (n) => (byNCache[subjectId] || (byNCache[subjectId] = Object.fromEntries(S().questions.map((q) => [q.n, q]))))[n];
-  const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll" };
-  const SRC_LONG = { vesait: "dərs vəsaitindən", kurs: "böyük kursların cavab faylından", umumi: "ümumi biliyə əsaslanır", hesab: "hesablanmış həll" };
+  const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll", user: "sənin" };
+  const SRC_LONG = { vesait: "dərs vəsaitindən", kurs: "böyük kursların cavab faylından", umumi: "ümumi biliyə əsaslanır", hesab: "hesablanmış həll", user: "sənin yüklədiyin materialdan" };
 
   // ---------- saxlama ----------
   const PREFIX = "biletcek.";
@@ -84,6 +85,71 @@
   const profileName = () => (profiles().find((p) => p.id === currentProfile()) || {}).name || "";
   const history = () => store.get("history:" + currentProfile() + ":" + subjectId, []);
   const setHistory = (h) => store.set("history:" + currentProfile() + ":" + subjectId, h);
+  // ---------- istifadəçinin öz fənləri (başqa universitet, başqa fənn): yalnız bu brauzerdə saxlanır ----------
+  const KINDS = ["theory", "problem", "speaking"];
+  const cut = (v, n) => String(v == null ? "" : v).slice(0, n);
+  // hər mənbədən (saxlanmış, idxal) gələn fənni təmizləyir: yalnız tanınan sahələr və uzunluq limitləri
+  function cleanSubject(x, id) {
+    if (!x || !Array.isArray(x.questions)) return null;
+    const qs = x.questions.slice(0, 300).map((q, i) => ({
+      n: i + 1, q: cut(q && q.q, 1500).trim(), kind: KINDS.includes(q && q.kind) ? q.kind : "theory",
+      group: "all", answer: cut(q && q.answer, 4000).trim(),
+    })).filter((q) => q.q.length > 3);
+    if (!qs.length) return null;
+    qs.forEach((q, i) => { q.n = i + 1; q.src = q.answer ? "user" : "umumi"; });
+    const main = KINDS.includes(x.kindDefault) ? x.kindDefault : qs[0].kind;
+    const per = Math.max(1, Math.min(10, Math.min(Number(x.per) || 3, qs.length)));
+    const lv = (BUILTIN.find((b) => b.id === "xdiak") || {}).levels || [];
+    const name = cut(x.name, 120).trim() || "Fənn";
+    return {
+      id, custom: true, name, short: cut(x.short, 14).trim() || name.slice(0, 14), exam: cut(x.exam, 30) || "Kollokvium",
+      lang: ["az", "en", "ru", "tr"].includes(x.lang) ? x.lang : "az", answer: x.answer === "text" ? "text" : "voice",
+      kindDefault: main, per, max: [10, 20, 30, 50, 100].includes(Number(x.max)) ? Number(x.max) : 20,
+      limit: [120, 180, 240].includes(Number(x.limit)) ? Number(x.limit) : 180,
+      levels: qs.some((q) => q.kind === "speaking") ? lv : [], ticket: Array(per).fill("all"),
+      ticketNote: `Biletdə ${per} sual düşür (${qs.length} sualdan, sənin yüklədiyin siyahıdan).`, questions: qs,
+    };
+  }
+  const loadCustom = () => {
+    const list = store.get("custom", []);
+    SUBJECTS = BUILTIN.concat((Array.isArray(list) ? list : []).map((x) => (x && typeof x.id === "string" && x.id.startsWith("u_") ? cleanSubject(x, x.id) : null)).filter(Boolean));
+  };
+  const saveCustom = (list) => { store.set("custom", list); return JSON.stringify(store.get("custom", null)) === JSON.stringify(list); };
+  loadCustom();
+  const ctxOf = (q) => btoa(unescape(encodeURIComponent(JSON.stringify({ name: S().name, lang: S().lang, kind: q.kind, n: q.n, q: q.q.slice(0, 1500), answer: (q.answer || "").slice(0, 3500) }))));
+  const apiExtra = (q) => (S().custom ? { "x-ctx": ctxOf(q) } : undefined);   // öz fənnində sual sorğu ilə gedir
+
+  // fayldan mətn: .txt/.md birbaşa, .docx və .pdf brauzerdə oxunur (kitabxanalar yalnız lazım olanda yüklənir)
+  const loadScript = (url) => new Promise((ok, no) => {
+    if (document.querySelector(`script[src="${url}"]`)) return ok();
+    const el = document.createElement("script"); el.src = url; el.onload = ok; el.onerror = () => no(new Error("Kitabxana yüklənmədi, internetə bax")); document.head.appendChild(el);
+  });
+  async function extractText(file) {
+    const name = file.name.toLowerCase();
+    if (name.endsWith(".docx")) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js");
+      return (await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() })).value;
+    }
+    if (name.endsWith(".pdf")) {
+      await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js");
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      const doc = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      let out = "";
+      for (let p = 1; p <= doc.numPages; p++) {
+        const items = (await (await doc.getPage(p)).getTextContent()).items;
+        let y = null;
+        for (const it of items) {
+          const ny = it.transform[5];
+          out += (y !== null && Math.abs(ny - y) > 2 ? "\n" : y !== null ? " " : "") + it.str; y = ny;
+        }
+        out += "\n\n";
+      }
+      return out;
+    }
+    if (/\.(txt|md|csv)$/.test(name) || file.type.startsWith("text/")) return file.text();
+    throw new Error("Bu format dəstəklənmir. .pdf, .docx, .txt və ya mətni yapışdır.");
+  }
+
   // XDİAK kimi fənlərdə qruplar fərqli səviyyədə oxuyur: səviyyə fənnə görə saxlanır
   const fixedLevelId = () => { const sub = S(); const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.level ? st.level : null; };   // qrupun səviyyəsi sabitdirsə
   const levelOf = () => { const lv = (S().levels || []); return lv.length ? (lv.find((l) => l.id === (fixedLevelId() || store.get("level:" + subjectId, null))) || lv[0]) : null; };
@@ -93,7 +159,9 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
   // etalon cavabın göstərilməsi: səhifə şəkilləri varsa (fizikada düsturlar), onlar; yoxsa mətn
-  const refBody = (q) => q.images && q.images.length
+  const refBody = (q) => !q.answer && !(q.images && q.images.length)
+    ? `<div class="ref"><p class="muted small">Bu sual üçün etalon cavab yüklənməyib: qiymətləndirmə süni intellektin öz fənn biliyinə əsaslanır. Redaktədə etalon cavab əlavə edə bilərsən.</p></div>`
+    : q.images && q.images.length
     ? `<div class="ref shots">${q.images.map((u) => `<img src="${u}" alt="Etalon cavab səhifəsi" loading="lazy">`).join("")}</div>`
     : `<div class="ref">${md(q.answer)}</div>`;
   // XDİAK: səviyyəyə uyğun nümunə cavab. İstifadəçi başqa nümunə də yarada bilər (Gemini ilə).
@@ -120,7 +188,7 @@
         const k = sampleKey(q), list = samples[k] || (samples[k] = []);
         const old = btn.textContent; btn.disabled = true; btn.textContent = "Yazılır…";
         try {
-          const r = await api(`s=${subjectId}&n=${q.n}&kind=sample&lv=${levelOf() ? levelOf().id : ""}&st=${curSetId() || ""}&v=${list.length + 1}`, "", "text/plain", settings());
+          const r = await api(`s=${subjectId}&n=${q.n}&kind=sample&lv=${levelOf() ? levelOf().id : ""}&st=${curSetId() || ""}&v=${list.length + 1}`, "", "text/plain", settings(), apiExtra(q));
           list.push(r);
           btn.closest(".sample").querySelector(".sample-body").innerHTML = sampleHtml(q);
           btn.textContent = "Başqa nümunə yarat";
@@ -156,7 +224,7 @@
     cleanup = [];
     window.scrollTo({ top: 0 });
     if (!currentProfile() && view !== "who") { VIEWS.who(view); return; }
-    if (!subjectId && !["who", "key", "subjects", "settings"].includes(view)) view = "subjects";
+    if (!subjectId && !["who", "key", "subjects", "settings", "create"].includes(view)) view = "subjects";
     renderTop();
     VIEWS[view](...args);
   }
@@ -286,25 +354,207 @@
 
     subjects() {
       const first = esc(profileName().split(" ")[0]);
+      const card = (x) => {
+        const h = store.get("history:" + currentProfile() + ":" + x.id, []);
+        const best = h.length ? one((Math.max(...h.map(examScore)) / 10) * (x.max || 20)) : null;
+        const inner = `
+          <span class="subject-tag">${esc(x.short)}</span>
+          <b class="subject-name">${esc(x.name)}</b>
+          <span class="muted small">${qsOf(x).length} sual · ${esc(x.exam)}</span>
+          <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 20}` : "Hələ bilet çəkməmisən"}</span>`;
+        return x.custom
+          ? `<div class="subject card custom"><button class="subject-open" data-sub="${x.id}">${inner}</button>
+               <div class="row small subject-actions"><span class="tag">sənin fənnin</span><button class="link" data-cedit="${x.id}">Redaktə</button><button class="link" data-cexp="${x.id}">Paylaş</button><button class="link" data-cdel="${x.id}">Sil</button></div></div>`
+          : `<button class="subject card" data-sub="${x.id}">${inner}</button>`;
+      };
       $app.innerHTML = `
         <section class="fade-in">
           <h1 style="margin-bottom:6px">${first ? first + ", hansı" : "Hansı"} fənndən bilet çəkirsən?</h1>
-          <p class="muted" style="margin:0 0 22px">Fənni seç. Suallar kafedranın kollokvium siyahısından, etalon cavablar dərs materiallarındandır.</p>
+          <p class="muted" style="margin:0 0 22px">Fənni seç. Hazır fənlərin suallar kafedranın siyahısından, etalon cavablar dərs materiallarındandır. Başqa universitetdənsən? Öz fənnini və suallarını özün yarada bilərsən.</p>
           <div class="subjects">
-            ${SUBJECTS.map((x) => {
-              const h = store.get("history:" + currentProfile() + ":" + x.id, []);
-              const best = h.length ? one((Math.max(...h.map(examScore)) / 10) * (x.max || 20)) : null;
-              return `
-              <button class="subject card" data-sub="${x.id}">
-                <span class="subject-tag">${esc(x.short)}</span>
-                <b class="subject-name">${esc(x.name)}</b>
-                <span class="muted small">${qsOf(x).length} sual · ${esc(x.exam)}</span>
-                <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 20}` : "Hələ bilet çəkməmisən"}</span>
-              </button>`;
-            }).join("")}
+            ${SUBJECTS.map(card).join("")}
+            <div class="subject card create">
+              <button class="subject-open" data-new>
+                <span class="subject-tag">+</span>
+                <b class="subject-name">Öz sınağını yarat</b>
+                <span class="muted small">Sual siyahını (PDF, Word, mətn) yüklə və ya yapışdır. Öz biletin, öz qiymətin.</span>
+              </button>
+              <div class="row small subject-actions"><label class="link" style="cursor:pointer">Dostun fənnini yüklə (.json)<input type="file" id="imp" accept=".json,application/json" hidden></label></div>
+            </div>
           </div>
         </section>`;
       $app.querySelectorAll("[data-sub]").forEach((b) => b.onclick = () => { subjectId = b.dataset.sub; store.set("subject", subjectId); go("home"); });
+      $app.querySelector("[data-new]").onclick = () => go("create");
+      $app.querySelectorAll("[data-cedit]").forEach((b) => b.onclick = () => go("create", b.dataset.cedit));
+      $app.querySelectorAll("[data-cexp]").forEach((b) => b.onclick = () => {
+        const x = SUBJECTS.find((y) => y.id === b.dataset.cexp);
+        const data = { format: "biletcek-subject", v: 1, subject: { name: x.name, short: x.short, exam: x.exam, lang: x.lang, answer: x.answer, kindDefault: x.kindDefault, per: x.per, max: x.max, limit: x.limit, questions: x.questions.map((q) => ({ q: q.q, kind: q.kind, answer: q.answer })) } };
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: "application/json" }));
+        a.download = `${x.short.replace(/[^\w\u0080-\uffff-]+/g, "_")}.biletcek.json`; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        toast("Fayl yükləndi. Dostuna göndər: o, 'Dostun fənnini yüklə' ilə açacaq.");
+      });
+      $app.querySelectorAll("[data-cdel]").forEach((b) => b.onclick = () => {
+        const x = SUBJECTS.find((y) => y.id === b.dataset.cdel);
+        if (!confirm(`"${x.name}" fənni və bütün nəticələri silinsin?`)) return;
+        saveCustom(store.get("custom", []).filter((y) => y.id !== x.id));
+        profiles().forEach((p) => store.del("history:" + p.id + ":" + x.id));
+        delete byNCache[x.id];
+        if (subjectId === x.id) { subjectId = null; store.del("subject"); }
+        loadCustom(); VIEWS.subjects();
+      });
+      $app.querySelector("#imp").onchange = async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        try {
+          const obj = JSON.parse(await f.text());
+          const sub = cleanSubject(obj && obj.subject, "u_" + Math.random().toString(36).slice(2, 9));
+          if (!sub) throw new Error("fayl düzgün deyil");
+          if (!saveCustom(store.get("custom", []).concat([sub]))) throw new Error("brauzer yaddaşı dolub");
+          loadCustom(); toast(`"${sub.name}" əlavə olundu`); VIEWS.subjects();
+        } catch (err) { toast("Yüklənmədi: " + err.message); }
+      };
+    },
+
+    create(editId) {
+      const ex = editId && SUBJECTS.find((x) => x.id === editId && x.custom);
+      const d = ex
+        ? { id: ex.id, name: ex.name, short: ex.short, exam: ex.exam, lang: ex.lang, answer: ex.answer, kindDefault: ex.kindDefault, per: ex.per, max: ex.max, limit: ex.limit, questions: ex.questions.map((q) => ({ q: q.q, kind: q.kind, answer: q.answer })) }
+        : { id: "u_" + Math.random().toString(36).slice(2, 9), name: "", short: "", exam: "Kollokvium", lang: "az", answer: "voice", kindDefault: "theory", per: 3, max: 20, limit: 180, questions: [] };
+      const opts = (list, cur) => list.map(([v, t]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("");
+      $app.innerHTML = `
+        <section class="fade-in stack" style="max-width:820px;margin:0 auto">
+          <div>
+            <h2>${ex ? "Fənni redaktə et" : "Öz sınağını yarat"}</h2>
+            <p class="muted" style="margin:0">Başqa universitetdən, başqa fəndənsən? Sualları yüklə və ya yapışdır, sonra öz biletini çək. Hər şey yalnız bu brauzerdə saxlanır.</p>
+          </div>
+          <div class="card stack">
+            <h3 style="margin:0">1. Fənn haqqında</h3>
+            <div class="grid2">
+              <label class="field"><span>Fənnin adı</span><input type="text" id="c-name" maxlength="120" value="${esc(d.name)}" placeholder="məs. Mikroiqtisadiyyat"></label>
+              <label class="field"><span>Qısa ad (kartda)</span><input type="text" id="c-short" maxlength="14" value="${esc(d.short)}" placeholder="məs. Mikro"></label>
+              <label class="field"><span>İmtahan növü</span><select id="c-exam">${opts([["Kollokvium", "Kollokvium"], ["İmtahan", "İmtahan"], ["Sınaq", "Sınaq"]], d.exam)}</select></label>
+              <label class="field"><span>Cavab dili</span><select id="c-lang">${opts([["az", "Azərbaycan"], ["en", "English"], ["ru", "Русский"], ["tr", "Türkçe"]], d.lang)}</select></label>
+              <label class="field"><span>Sualların növü</span><select id="c-kind">${opts([["theory", "Nəzəri suallar"], ["problem", "Məsələlər (hesablama)"], ["speaking", "Speaking (ingilis dilində danışıq)"]], d.kindDefault)}</select></label>
+              <label class="field"><span>Cavab forması</span><select id="c-answer">${opts([["voice", "Səslə (yazılı da olar)"], ["text", "Yazılı (səslə də olar)"]], d.answer)}</select></label>
+              <label class="field"><span>Biletdə neçə sual</span><select id="c-per">${opts([1, 2, 3, 4, 5, 6, 8, 10].map((n) => [n, n]), d.per)}</select></label>
+              <label class="field"><span>Maksimum bal</span><select id="c-max">${opts([10, 20, 30, 50, 100].map((n) => [n, n]), d.max)}</select></label>
+              <label class="field"><span>Danışma limiti (suala)</span><select id="c-limit">${opts([[120, "2 dəqiqə"], [180, "3 dəqiqə"], [240, "4 dəqiqə"]], d.limit)}</select></label>
+            </div>
+          </div>
+          <div class="card stack">
+            <h3 style="margin:0">2. Suallar</h3>
+            <p class="muted small" style="margin:0">Sual siyahını (PDF, Word, .txt) yüklə və ya mətni yapışdır. Fayl brauzerdə oxunur. Yalnız aşağıdakı "tap/yarat" düymələrinə basanda mətn sənin Gemini açarınla süni intellektə göndərilir. Etalon cavab məcburi deyil: olmasa, süni intellekt öz biliyinə görə yoxlayır.</p>
+            <div class="row"><label class="btn ghost" style="cursor:pointer">Fayl seç (PDF, DOCX, TXT)<input type="file" id="c-file" accept=".pdf,.docx,.txt,.md,text/plain" hidden></label><span class="muted small" id="c-fname"></span></div>
+            <textarea id="c-src" rows="7" placeholder="…və ya sual siyahısını / dərs materialını bura yapışdır">${esc(d.source || "")}</textarea>
+            <label class="field"><span>İstəyə bağlı qeyd (süni intellektə kömək edir)</span><input type="text" id="c-hint" maxlength="300" placeholder="məs. 'bu, 2-ci kollokviumun suallarıdır, sonda cavablar da var'"></label>
+            <div class="row">
+              <button class="btn" id="c-extract">Sualları tap</button>
+              <button class="btn ghost" id="c-lines">Hər sətir bir sual</button>
+              <span class="row" style="gap:6px;flex-wrap:nowrap"><button class="btn ghost" id="c-gen">Materialdan sual yarat</button><select id="c-count" style="width:auto">${opts([10, 15, 20, 30].map((n) => [n, n + " sual"]), 15)}</select></span>
+            </div>
+            <p class="small" id="c-status" style="margin:0"></p>
+          </div>
+          <div class="card stack">
+            <div class="row" style="justify-content:space-between"><h3 style="margin:0">3. Siyahı <span class="muted small" id="c-count-label"></span></h3>
+              <div class="row"><button class="btn ghost" id="c-add">+ Sual əlavə et</button><button class="btn ghost" id="c-mkans">Etalon cavabları materialdan yarat</button></div></div>
+            <div id="c-list"></div>
+          </div>
+          <div class="row"><button class="btn accent" id="c-save">Yadda saxla</button><button class="btn ghost" id="c-cancel">Ləğv et</button></div>
+        </section>`;
+      const $ = (id) => $app.querySelector("#" + id);
+      const ql = $("c-list"), st = $("c-status"), ta = $("c-src");
+      const status = (m, bad) => { st.textContent = m; st.style.color = bad ? "var(--red)" : ""; st.className = "small" + (bad ? "" : " muted"); };
+      const renderList = () => {
+        $("c-count-label").textContent = d.questions.length ? `(${d.questions.length})` : "";
+        ql.innerHTML = d.questions.length ? d.questions.map((x, i) => `
+          <div class="qedit" data-i="${i}">
+            <div class="row" style="justify-content:space-between"><b style="font-family:var(--serif);color:var(--accent)">${i + 1}.</b><button class="link" data-rm="${i}">Sil</button></div>
+            <textarea data-f="q" rows="2" placeholder="Sual">${esc(x.q)}</textarea>
+            <details ${x.answer ? "open" : ""}><summary class="small">Etalon cavab ${x.answer ? "" : "(yoxdur, istəyə bağlıdır)"}</summary><textarea data-f="answer" rows="4" placeholder="Etalon cavab (boş qala bilər)">${esc(x.answer)}</textarea></details>
+          </div>`).join("") : `<p class="muted small" style="margin:0">Hələ sual yoxdur. Yuxarıdan əlavə et.</p>`;
+      };
+      ql.addEventListener("input", (e) => { const row = e.target.closest(".qedit"); if (row && e.target.dataset.f) d.questions[+row.dataset.i][e.target.dataset.f] = e.target.value; });
+      ql.addEventListener("click", (e) => { const rm = e.target.closest("[data-rm]"); if (rm) { d.questions.splice(+rm.dataset.rm, 1); renderList(); } });
+      const kindNow = () => $("c-kind").value;
+      const addQuestions = (list) => {
+        const room = 300 - d.questions.length;
+        list.slice(0, room).forEach((x) => d.questions.push({ q: x.q, answer: x.answer || "", kind: KINDS.includes(x.kind) ? x.kind : kindNow() }));
+        renderList();
+      };
+      const busy = (btn, label, fn) => async () => {
+        if (btn.disabled) return;
+        const old = btn.textContent; btn.disabled = true; btn.textContent = label;
+        try { await fn(); } catch (err) { status("Xəta: " + (err.message || err), true); } finally { btn.disabled = false; btn.textContent = old; }
+      };
+      const needAI = () => { if (needKey()) { toast("Bu funksiya üçün Gemini açarı lazımdır (Ayarlar)."); throw new Error("Gemini açarı əlavə et (Ayarlar → açar)."); } };
+
+      $("c-file").onchange = async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        $("c-fname").textContent = f.name; status("Fayl oxunur…");
+        try {
+          const t = (await extractText(f)).replace(/\r/g, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+          if (t.length < 20) throw new Error("Faylda mətn tapılmadı (skan olunmuş PDF ola bilər). Mətni əl ilə yapışdır.");
+          ta.value = t.slice(0, 60000);
+          status(`${t.length.toLocaleString("az")} simvol oxundu${t.length > 60000 ? " (ilk 60 000 simvol götürüldü)" : ""}. İndi "Sualları tap" bas.`);
+        } catch (err) { status("Xəta: " + err.message, true); }
+      };
+      $("c-extract").onclick = busy($("c-extract"), "Tapılır…", async () => {
+        needAI();
+        if (ta.value.trim().length < 20) throw new Error("Əvvəlcə fayl yüklə və ya mətn yapışdır.");
+        const r = await api("kind=parse", JSON.stringify({ text: ta.value, mode: "extract", hint: $("c-hint").value }), "text/plain", settings());
+        if (!r.questions.length) throw new Error("Sual tapılmadı. 'Hər sətir bir sual' ilə cəhd et.");
+        addQuestions(r.questions);
+        status(`${r.questions.length} sual tapıldı${r.questions.some((x) => x.answer) ? " (bəzilərinin cavabı da fayldan götürüldü)" : ""}. Aşağıda yoxla, lazım olmayanı sil.`);
+      });
+      $("c-gen").onclick = busy($("c-gen"), "Yazılır…", async () => {
+        needAI();
+        if (ta.value.trim().length < 100) throw new Error("Material çox qısadır: dərs mətnini yapışdır.");
+        const r = await api("kind=parse", JSON.stringify({ text: ta.value, mode: "generate", count: Number($("c-count").value), hint: $("c-hint").value }), "text/plain", settings());
+        addQuestions(r.questions);
+        status(`${r.questions.length} sual və etalon cavab yaradıldı (materialdan). Yoxla və lazım olduqda düzəlt.`);
+      });
+      $("c-lines").onclick = () => {
+        const lines = ta.value.split("\n").map((l) => l.replace(/^\s*(\d+\s*[.)]|[-•*])\s*/, "").trim()).filter((l) => l.length > 8);
+        if (!lines.length) { status("Mətn boşdur.", true); return; }
+        addQuestions(lines.map((q) => ({ q, answer: "" })));
+        status(`${lines.length} sual əlavə edildi (hər sətir bir sual).`);
+      };
+      $("c-add").onclick = () => { d.questions.push({ q: "", answer: "", kind: kindNow() }); renderList(); ql.querySelector(".qedit:last-child textarea").focus(); };
+      $("c-mkans").onclick = busy($("c-mkans"), "Yazılır…", async () => {
+        needAI();
+        if (ta.value.trim().length < 30) throw new Error("Etalon cavab üçün material lazımdır: dərs mətnini yuxarıdakı xanaya yapışdır.");
+        const todo = d.questions.map((x, i) => ({ i: i + 1, q: x.q, has: !!x.answer })).filter((x) => !x.has && x.q.trim().length > 3);
+        if (!todo.length) throw new Error("Bütün suallarda artıq cavab var.");
+        let done = 0;
+        for (let k = 0; k < todo.length; k += 8) {
+          const batch = todo.slice(k, k + 8);
+          status(`Etalon cavablar yazılır… ${done}/${todo.length}`);
+          const r = await api("kind=answers", JSON.stringify({ material: ta.value, items: batch.map((x) => ({ i: x.i, q: x.q })) }), "text/plain", settings());
+          r.answers.forEach((a) => { if (d.questions[a.i - 1] && !d.questions[a.i - 1].answer) { d.questions[a.i - 1].answer = a.answer; done++; } });
+          renderList();
+        }
+        status(`${done} sual üçün etalon cavab yazıldı (materialdan). "(Materialda yoxdur)" yazılanlara diqqət et.`);
+      });
+      $("c-cancel").onclick = () => go("subjects");
+      $("c-save").onclick = () => {
+        const name = $("c-name").value.trim();
+        if (name.length < 2) { toast("Fənnin adını yaz"); $("c-name").focus(); return; }
+        const qs = d.questions.filter((x) => x.q.trim().length > 3);
+        if (!qs.length) { toast("Ən az bir sual əlavə et"); return; }
+        const sub = cleanSubject({
+          name, short: $("c-short").value.trim() || name, exam: $("c-exam").value, lang: $("c-lang").value, answer: $("c-answer").value,
+          kindDefault: kindNow(), per: Number($("c-per").value), max: Number($("c-max").value), limit: Number($("c-limit").value), questions: qs,
+        }, d.id);
+        const list = store.get("custom", []).filter((x) => x.id !== d.id).concat([sub]);
+        if (!saveCustom(list)) { toast("Brauzer yaddaşı doludur: bəzi fənləri sil və ya cavabları qısalt."); return; }
+        delete byNCache[d.id];
+        loadCustom();
+        subjectId = d.id; store.set("subject", subjectId);
+        toast(`"${sub.name}" saxlandı: ${sub.questions.length} sual`);
+        go("home");
+      };
+      renderList();
     },
 
     home() {
@@ -737,7 +987,8 @@
       }
       return picked.sort((a, b) => a - b);
     }
-    return sub.ticket.map((g) => { const pool = qsOf(sub).filter((q) => q.group === g); return pool[rand(pool.length)].n; });
+    const used = new Set();
+    return sub.ticket.map((g) => { const all = qsOf(sub).filter((q) => q.group === g); const pool = all.filter((q) => !used.has(q.n)); const pick = (pool.length ? pool : all)[rand((pool.length ? pool : all).length)].n; used.add(pick); return pick; }).sort((a, b) => a - b);
   }
 
   function lastScores() {
@@ -849,8 +1100,8 @@
   // ---------- server (Vercel funksiyası /api/grade) ----------
   const cleanKey = (k) => String(k || "").replace(/[^\x21-\x7e]/g, "");
 
-  async function api(query, body, contentType, s) {
-    const headers = { "Content-Type": contentType };
+  async function api(query, body, contentType, s, extra) {
+    const headers = { "Content-Type": contentType, ...(extra || {}) };
     if (s.key) headers["x-user-key"] = cleanKey(s.key);
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 130000);
@@ -874,9 +1125,9 @@
     if (!answer) return { transcript: "", score: 0, covered: [], missed: ["Cavab verilmədi"], feedback: "Bu suala cavab verilmədi.", speech: "" };
     if (answer.kind === "audio") {
       if (!answer.wav) answer.wav = await toWav(answer.blob); // təkrar cəhddə yenidən çevirmə
-      return api(`s=${subjectId}&n=${q.n}&kind=audio${lvQ()}`, answer.wav, "audio/wav", s);
+      return api(`s=${subjectId}&n=${q.n}&kind=audio${lvQ()}`, answer.wav, "audio/wav", s, apiExtra(q));
     }
-    return api(`s=${subjectId}&n=${q.n}&kind=text${lvQ()}`, answer.text, "text/plain; charset=utf-8", s);
+    return api(`s=${subjectId}&n=${q.n}&kind=text${lvQ()}`, answer.text, "text/plain; charset=utf-8", s, apiExtra(q));
   }
 
   // ---------- açar forması (istəyə bağlı) ----------

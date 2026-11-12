@@ -250,3 +250,13 @@ summary { cursor: pointer; color: var(--ink-2); font-size: 14px; font-weight: 50
 
 .ref.official { border-left: 3px solid var(--accent); padding-left: 14px; margin-bottom: 4px; }
 .ref.official h4 { font-family: var(--serif); font-size: 15px; color: var(--accent); }
+
+/* ---------- öz fənni yaratmaq ---------- */
+.subject.custom, .subject.create { cursor: default; }
+.subject-open { background: none; border: 0; padding: 0; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; color: inherit; font: inherit; cursor: pointer; flex: 1; }
+.subject-actions { margin-top: 12px; padding-top: 8px; border-top: 1px dashed var(--rule); width: 100%; gap: 2px; }
+.subject.create { border-style: dashed; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+.qedit { border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px; background: var(--paper); }
+.qedit + .qedit { margin-top: 10px; }
+.qedit textarea { width: 100%; margin-top: 6px; }
