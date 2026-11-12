@@ -139,7 +139,8 @@
   const maxOf = () => (S() && S().max) || 20;
   const pts = (q10) => (q10 / 10) * maxOf();                      // 0–10 keyfiyyət → kollokvium balı
   const one = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
-  const examScore = (r) => r.total / r.items.length;            // 0–10 (dəqiq)
+  const answeredOf = (r) => r.items.filter((i) => !i.skipped);   // "etalona bax" seçilənlər balda sayılmır
+  const examScore = (r) => { const a = answeredOf(r); return a.length ? r.total / a.length : 0; };   // 0–10 (dəqiq)
   const share = (score, count) => score / count;                // sualın 10 baldakı payı
 
   // ---------- naviqasiya ----------
@@ -420,13 +421,15 @@
             ${hint ? `<p class="muted small" style="margin:0">${hint}</p>` : ""}
             <div id="rec-body"></div>
           </div>
-          <div class="row" style="justify-content:flex-end">
+          <div class="row" style="justify-content:space-between">
+            <button class="link" id="skip" title="Bu suala cavab vermək məcburi deyil">Cavab vermirəm, etalona bax</button>
             <button class="btn" id="next" disabled>${last ? "Bileti təhvil ver" : "Növbəti sual →"}</button>
           </div>
         </section>`;
       const body = $app.querySelector("#rec-body");
       const next = $app.querySelector("#next");
       const toggle = $app.querySelector("#mode-toggle");
+      const skipBtn = $app.querySelector("#skip");
       let typing = S().answer === "text" && !exam.answers[i];   // fizika: yazılı, səs istəyə bağlı
       let rec = null;
 
@@ -437,7 +440,25 @@
         typing = !typing; setAnswer(null); draw();
       };
 
+      skipBtn.onclick = () => { if (rec) { rec.stop(true); rec = null; } setAnswer({ kind: "skip" }); draw(); };
+
       function draw() {
+        const skipped = exam.answers[i] && exam.answers[i].kind === "skip";
+        toggle.hidden = skipped; skipBtn.hidden = skipped;
+        if (skipped) {
+          // cavab vermədən etalona baxış: nəzəri sual/məsələ üçün etalon, speaking üçün nümunə cavab
+          const panel = q.kind === "speaking"
+            ? sampleBlock(q).replace("<details ", "<details open ")
+            : `<h4 style="margin:0 0 6px">Etalon cavab <span class="muted small">(${SRC_LONG[q.src]})</span></h4>${refBody(q)}`;
+          body.innerHTML = `${panel}<div class="row" style="margin-top:14px"><button class="btn ghost" id="unskip">Yenə də cavab verəcəm</button></div><p class="muted small" style="margin:10px 0 0">Bu sual bilet balına daxil edilmir.</p>`;
+          body.querySelector("#unskip").onclick = () => { setAnswer(null); draw(); };
+          if (q.kind === "speaking") {
+            bindSamples(body);
+            const gen = body.querySelector("[data-sample]");
+            if (gen && !(samples[sampleKey(q)] || []).length && !needKey()) gen.click();   // nümunə avtomatik yaradılır
+          }
+          return;
+        }
         toggle.textContent = typing ? "Səslə cavab ver" : "Yazılı cavab ver";
         if (typing) {
           body.innerHTML = `<textarea id="txt" placeholder="${q.kind === "speaking" ? "Write your answer here…" : q.kind === "problem" ? "Həllini və cavabını bura yaz…" : "Cavabını bura yaz…"}"></textarea>`;
@@ -494,7 +515,8 @@
     async grading() {
       exam.finished = true;
       const s = settings();
-      if (needKey()) { toast("Cavabların yadda saxlanıb. Qiymət üçün əvvəlcə açar əlavə et."); go("key", "grading"); return; }
+      const allSkipped = exam.answers.every((a) => a && a.kind === "skip");
+      if (needKey() && !allSkipped) { toast("Cavabların yadda saxlanıb. Qiymət üçün əvvəlcə açar əlavə et."); go("key", "grading"); return; }
       $app.innerHTML = `
         <section class="card fade-in stack">
           <div class="row"><div class="spinner"></div><h2 style="margin:0">Qiymətləndirilir…</h2></div>
@@ -529,15 +551,19 @@
     },
 
     result(rec) {
-      const sc = examScore(rec), n = rec.items.length;
+      const sc = examScore(rec), n = answeredOf(rec).length || 1, none = !answeredOf(rec).length;
       $app.innerHTML = `
         <section class="fade-in stack">
           <div class="card verdict">
-            <div class="grade"><div><b>${one(pts(sc))}</b><span>${maxOf()} baldan</span></div></div>
+            <div class="grade"><div><b>${none ? "—" : one(pts(sc))}</b><span>${none ? "cavabsız" : maxOf() + " baldan"}</span></div></div>
             <div>
               <p class="muted small" style="margin:0">${esc(S().short)} · Bilet №${rec.ticket} · ${new Date(rec.date).toLocaleString("az-AZ")}</p>
-              <h2 style="margin:4px 0 12px">${esc(S().exam.split(" ·")[0])} balı: ${one(pts(sc))} / ${maxOf()}</h2>
-              ${rec.items.map((it, i) => `
+              <h2 style="margin:4px 0 12px">${none ? "Cavab verilməyib: etalonlara bax" : `${esc(S().exam.split(" ·")[0])} balı: ${one(pts(sc))} / ${maxOf()}`}</h2>${rec.items.some((x) => x.skipped) && !none ? `<p class="muted small" style="margin:-6px 0 10px">Bal yalnız cavab verdiyin suallar üzrədir.</p>` : ""}
+              ${rec.items.map((it, i) => it.skipped ? `
+                <div class="scorebar" style="margin-bottom:6px">
+                  <span class="small" style="min-width:64px">Sual ${i + 1}</span>
+                  <span class="muted small">cavabsız (etalona baxdın)</span>
+                </div>` : `
                 <div class="scorebar" style="margin-bottom:6px">
                   <span class="small" style="min-width:64px">Sual ${i + 1}</span>
                   <div class="bar"><div style="width:${it.score * 10}%;background:${scoreColor(it.score)}"></div></div>
@@ -547,6 +573,14 @@
           </div>
           ${rec.items.map((it, i) => {
             const q = qOf(it.n);
+            if (it.skipped) return `
+            <article class="card stack">
+              <div>
+                <p class="muted small" style="margin:0">Sual ${i + 1} · №${it.n} · cavabsız</p>
+                <h3 style="margin:2px 0 0">${esc(q.q)}</h3>
+              </div>
+              ${q.kind === "speaking" ? sampleBlock(q).replace("<details ", "<details open ") : `<details open><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
+            </article>`;
             return `
             <article class="card stack">
               <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -694,15 +728,16 @@
 
   function lastScores() {
     const out = {};
-    for (const r of history().slice().reverse()) for (const it of r.items) out[it.n] = it.score;
+    for (const r of history().slice().reverse()) for (const it of r.items) if (!it.skipped) out[it.n] = it.score;
     return out;
   }
 
   function saveToHistory(ex) {
     const items = ex.qs.map((n, i) => ({ n, ...ex.results[i] }));
-    const total = items.reduce((a, x) => a + x.score, 0);
-    const rec = { date: Date.now(), ticket: ex.ticket, items, total, pct: Math.round((total / (items.length * 10)) * 100) };
-    const h = history(); h.unshift(rec); setHistory(h.slice(0, 100));
+    const done = items.filter((x) => !x.skipped);
+    const total = done.reduce((a, x) => a + x.score, 0);
+    const rec = { date: Date.now(), ticket: ex.ticket, items, total, pct: done.length ? Math.round((total / (done.length * 10)) * 100) : 0 };
+    if (done.length) { const h = history(); h.unshift(rec); setHistory(h.slice(0, 100)); }
     ex.record = rec;
   }
 
@@ -821,6 +856,7 @@
 
   const lvQ = () => (levelOf() ? `&lv=${levelOf().id}` : "");
   async function gradeOne(q, answer, s) {
+    if (answer && answer.kind === "skip") return { skipped: true, transcript: "", score: 0, covered: [], missed: [], feedback: "", speech: "" };
     if (!answer) return { transcript: "", score: 0, covered: [], missed: ["Cavab verilmədi"], feedback: "Bu suala cavab verilmədi.", speech: "" };
     if (answer.kind === "audio") {
       if (!answer.wav) answer.wav = await toWav(answer.blob); // təkrar cəhddə yenidən çevirmə
