@@ -1,9 +1,9 @@
-// Vercel funksiyası: tələbənin cavabını Gemini ilə qiymətləndirir.
+// Vercel funksiyası: tələbənin cavabını Gemini ilə qiymətləndirir (bütün fənlər: sual növünə görə prompt).
 // Açar serverdə saxlanır (GEMINI_API_KEY). İstifadəçi öz açarını "x-user-key" başlığı ilə göndərsə, o istifadə olunur.
-// POST /api/grade?n=5&kind=audio   body: audio/wav (xam bayt)
-// POST /api/grade?n=5&kind=text    body: mətn (text/plain)
+// POST /api/grade?s=fizika&n=5&kind=audio   body: audio/wav (xam bayt)
+// POST /api/grade?s=adiak&n=5&kind=text     body: mətn (text/plain)
 // POST /api/grade?ping=1           açarın işlədiyini yoxlayır
-import QUESTIONS from "./_data.js";
+import DATA from "./_data.js";
 
 const MODELS = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 const MAX_BYTES = 4_400_000; // Vercel sorğu limiti 4.5 MB
@@ -21,23 +21,56 @@ const SCHEMA = {
   required: ["transcript", "score", "covered", "missed", "feedback", "speech"],
 };
 
-const PROMPT = (q, kind) => `Sən Azərbaycan Texniki Universitetində "Azərbaycan dilində işgüzar və akademik kommunikasiya" (ADİAK) fənnindən kollokvium qəbul edən müəllimsən. Tələbə biletdəki suala ${kind === "audio" ? "şifahi" : "yazılı"} cavab verib.
+const SRC_LABEL = {
+  vesait: "dərs vəsaitindən",
+  kurs: "böyük kursların cavab faylından",
+  umumi: "fənnin ümumi məzmunundan",
+  hesab: "hesablanmış həll",
+};
 
-SUAL №${q.n}: ${q.q}
+const OUT_RULES = (kind) => `transcript: ${kind === "audio" ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : "Tələbənin mətnini olduğu kimi qaytar."}`;
 
-ETALON CAVAB (${q.src === "vesait" ? "dərs vəsaitindən" : "fənnin ümumi məzmunundan"}):
+// Sual növünə görə prompt: nəzəri sual, məsələ, ingilis dilində speaking
+const PROMPT = (subj, q, kind, level) => {
+  const how = kind === "audio" ? "şifahi" : "yazılı";
+  if (q.kind === "speaking") {
+    return `You are an English teacher examining a university student in a speaking colloquium (course: "${subj.name}"). The student answered the speaking task ${kind === "audio" ? "orally" : "in writing"}.
+
+STUDENT'S COURSE LEVEL: ${level ? `${level.label}. Expectations at this level: ${level.desc}` : "about A2–B1"}
+Different student groups study at different levels and their teachers expect different things, so grade RELATIVE TO THIS LEVEL: a 10 means "excellent for this level", not "native-like". Never ask for or penalise the absence of vocabulary or structures above this level. Do count every lexical and grammatical mistake that is visible in the transcript, because the transcript must be literal (see below): wrong tense, missing or wrong articles, subject–verb agreement, word order, plurals, prepositions, wrong word choice or collocation, Azerbaijani-English literal translations. Mistakes in structures the level should already control weigh more; mistakes in structures clearly beyond the level weigh less.
+
+TASK ${q.n}: ${q.q}
+
+Do this:
+1. transcript: ${kind === "audio" ? "Transcribe the audio LITERALLY, word for word, in English, keeping the student's grammar and word-choice mistakes exactly as spoken (do not correct, smooth or complete anything; if a word was mispronounced so that it sounds like another word, write what was said and add [unclear] if unsure). If the recording is empty or unintelligible, say so." : "Return the student's text as it is, with all its mistakes."}
+2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one, and a short but correct and relevant answer at an elementary level is fine.
+3. score (0–10): 9–10 = answers fully, well organised, few minor errors; 7–8 = answers clearly, some errors that do not block meaning; 5–6 = understandable but simple or with frequent errors; 3–4 = very limited, hard to follow; 1–2 = a few words/phrases; 0 = no answer or off-topic.
+4. covered: what the student did well (short phrases, in Azerbaijani). missed: the mistakes found in the transcript, at most 8, most important first, each in the form: "[qrammatika] dedin: ... → düzgünü: ..." or "[leksika] dedin: ... → düzgünü: ..." (quote the student's exact words, give the correct English, add a very short explanation in Azerbaijani when needed). If there are no real mistakes, return an empty list.
+5. feedback: 2–3 sentences in Azerbaijani addressed to the student ("sən"): what was good and what to do to raise the score.
+6. speech: 1 sentence in Azerbaijani about fluency and pronunciation (hesitations, filler words, sentence variety).
+Write covered/missed/feedback/speech in Azerbaijani; keep quoted English as English.`;
+  }
+  const problem = q.kind === "problem";
+  return `Sən Azərbaycan Texniki Universitetində "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.
+
+${problem ? "MƏSƏLƏ" : "SUAL"} №${q.n}: ${q.q}
+
+${problem ? "DÜZGÜN HƏLL VƏ CAVAB" : "ETALON CAVAB"} (${SRC_LABEL[q.src] || "etalon"}):
 """
 ${q.answer}
 """
 
 Tapşırıq:
-1. transcript: ${kind === "audio" ? "Səs yazısını Azərbaycan dilində olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : "Tələbənin mətnini olduğu kimi qaytar."}
-2. Cavabı etalonla müqayisə et. Etalon yalnız istiqamətdir: tələbə öz sözləri ilə, başqa düzgün misallarla danışa bilər; mənaca doğru olan hər fikri say. Sual bir neçə hissədən ibarətdirsə, hər hissənin cavablandırılıb-cavablandırılmadığını yoxla. Faktiki səhvləri "missed" bölməsində qeyd et.
-3. score (0–10): 9–10 = əsas fikirlərin demək olar hamısı, məntiqi ardıcıllıq və terminlərlə; 7–8 = əsas fikirlər var, bir-iki boşluq; 5–6 = mövzunun yarısı, səthi; 3–4 = bir neçə doğru fikir; 1–2 = çox az və ya ümumi sözlər; 0 = cavab yoxdur və ya mövzudan kənardır. Ədalətli ol, amma uzun danışmağı məzmun kimi qiymətləndirmə.
-4. covered: tələbənin düzgün dediyi əsas fikirlər (hər biri qısa ifadə). missed: etalonda olub deyilməyən ən vacib fikirlər (ən çox 5, qısa).
+1. ${OUT_RULES(kind)}
+2. ${problem
+    ? "Tələbənin həllini yoxla: düzgün düstur seçib, ədədləri düz əvəz edib və son cavabı (ölçü vahidi ilə) düz tapıbmı. Şifahi danışıqda ədədlərin eşidilməsi çətin ola bilər, əvəzetməni məntiqə görə yoxla. Son cavab düzdürsə, lakin həll yolu aydın deyilsə, balı bir az azalt. Cavab səhvdirsə, ara addımlara görə qismən bal ver və səhvin harada olduğunu göstər."
+    : "Cavabı etalonla müqayisə et. Etalon yalnız istiqamətdir: tələbə öz sözləri ilə, başqa düzgün misallarla danışa bilər; mənaca doğru olan hər fikri say. Sual bir neçə hissədən ibarətdirsə, hər hissənin cavablandırılıb-cavablandırılmadığını yoxla. Faktiki səhvləri \"missed\" bölməsində qeyd et."}
+3. score (0–10): 9–10 = ${problem ? "düzgün həll və düzgün cavab" : "əsas fikirlərin demək olar hamısı, məntiqi ardıcıllıq və terminlərlə"}; 7–8 = ${problem ? "yol düzdür, kiçik hesab və ya vahid səhvi" : "əsas fikirlər var, bir-iki boşluq"}; 5–6 = ${problem ? "yolun yarısı düzdür" : "mövzunun yarısı, səthi"}; 3–4 = ${problem ? "düstur var, həll yarımçıq" : "bir neçə doğru fikir"}; 1–2 = çox az və ya ümumi sözlər; 0 = cavab yoxdur və ya mövzudan kənardır. Ədalətli ol, amma uzun danışmağı məzmun kimi qiymətləndirmə.
+4. covered: tələbənin düzgün dediyi əsas fikirlər${problem ? " və ya düzgün addımlar" : ""} (hər biri qısa ifadə). missed: ${problem ? "səhv və ya buraxılmış addımlar" : "etalonda olub deyilməyən ən vacib fikirlər"} (ən çox 5, qısa).
 5. feedback: tələbəyə "sən" deyə müraciət edən 2–3 cümləlik konkret rəy: nə yaxşı idi, balı artırmaq üçün nə əlavə etməli idi.
 6. speech: ${kind === "audio" ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
 Bütün mətnlər Azərbaycan dilində olsun.`;
+};
 
 const json = (status, obj) => new Response(JSON.stringify(obj), {
   status,
@@ -98,7 +131,8 @@ export async function POST(request) {
 
   const n = Number(url.searchParams.get("n"));
   const kind = url.searchParams.get("kind");
-  const q = QUESTIONS.find((x) => x.n === n);
+  const subj = DATA[url.searchParams.get("s") || "adiak"]; // köhnə müştərilər fənn göndərmir: ADİAK
+  const q = subj && subj.q[n];
   if (!q || !["audio", "text"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
 
   const len = Number(request.headers.get("content-length") || 0);
@@ -106,7 +140,9 @@ export async function POST(request) {
   const body = Buffer.from(await request.arrayBuffer());
   if (!body.length || body.length > MAX_BYTES) return json(413, { error: "Cavab boşdur və ya çox böyükdür" });
 
-  const parts = [{ text: PROMPT(q, kind) }];
+  const lvId = url.searchParams.get("lv");
+  const level = (subj.levels || []).find((l) => l.id === lvId) || (subj.levels || [])[0];
+  const parts = [{ text: PROMPT(subj, q, kind, level) }];
   if (kind === "audio") {
     if (body.subarray(0, 4).toString("ascii") !== "RIFF") return json(400, { error: "Səs WAV formatında deyil" });
     parts.push({ inline_data: { mime_type: "audio/wav", data: body.toString("base64") } });

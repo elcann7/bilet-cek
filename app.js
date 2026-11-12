@@ -1,17 +1,51 @@
-/* ADİAK Bilet — kollokvium simulyatoru.
-   Axın: bilet çək → hazırlıq → 3 suala səsli cavab → Gemini (səs→mətn + qiymət) → nəticə. */
+/* Bilet Çək — universitet kollokvium və imtahan simulyatoru (bütün fənlər).
+   Axın: fənn seç → bilet çək → hazırlıq → suallara səsli cavab → Gemini (səs→mətn + qiymət) → nəticə.
+   Fənlər subjects.js-dədir (build_subjects.py yaradır). */
 (() => {
   "use strict";
 
-  const Q = window.QUESTIONS;
-  const byN = Object.fromEntries(Q.map((q) => [q.n, q]));
+  const NEW_HOST = "bilet-cek.vercel.app";
+  const OLD_HOSTS = ["adiak-bilet.vercel.app", "biletcek.vercel.app"];
+  const SUBJECTS = window.SUBJECTS;
   const $app = document.getElementById("app");
+  let subjectId = null;                                   // seçilmiş fənn
+  const S = () => SUBJECTS.find((x) => x.id === subjectId);
+  const byNCache = {};
+  const qOf = (n) => (byNCache[subjectId] || (byNCache[subjectId] = Object.fromEntries(S().questions.map((q) => [q.n, q]))))[n];
+  const SRC = { vesait: "vəsait", kurs: "böyük kurs", umumi: "ümumi", hesab: "həll" };
+  const SRC_LONG = { vesait: "dərs vəsaitindən", kurs: "böyük kursların cavab faylından", umumi: "ümumi biliyə əsaslanır", hesab: "hesablanmış həll" };
 
   // ---------- saxlama ----------
+  const PREFIX = "biletcek.";
   const store = {
-    get(k, d) { try { const v = localStorage.getItem("adiak." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem("adiak." + k, JSON.stringify(v)); } catch { /* özəl rejim */ } },
+    get(k, d) { try { const v = localStorage.getItem(PREFIX + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(PREFIX + k, JSON.stringify(v)); } catch { /* özəl rejim */ } },
+    del(k) { try { localStorage.removeItem(PREFIX + k); } catch { /* */ } },
   };
+
+  // Köhnə ünvandan (adiak-bilet.vercel.app) yeni ünvana keçid: profillər, açar və tarixçə hash ilə daşınır
+  // (hash serverə göndərilmir). Açıldıqdan sonra ünvan sətirindən silinir.
+  (function migrate() {
+    try {
+      if (OLD_HOSTS.includes(location.hostname)) {
+        const data = {};
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("adiak.")) data[k] = localStorage.getItem(k); }
+        location.replace(`https://${NEW_HOST}/` + (Object.keys(data).length ? "#m=" + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(data))))) : ""));
+        return;
+      }
+      const m = /^#m=(.+)$/.exec(location.hash);
+      if (m) {
+        const data = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(m[1])))));
+        for (const [k, v] of Object.entries(data)) if (k.startsWith("adiak.") && localStorage.getItem(PREFIX + k.slice(6)) == null) localStorage.setItem(PREFIX + k.slice(6), v);
+        history.replaceState(null, "", location.pathname);
+      }
+    } catch { /* köçürmə alınmadısa, istifadəçi sadəcə yenidən başlayır */ }
+  })();
+  // köhnə (tək fənli) tarixçə ADİAK-a aid olur: "history:<profil>" → "history:<profil>:adiak"
+  store.get("profiles", []).forEach((p) => {
+    const old = store.get("history:" + p.id, null);
+    if (old && store.get("history:" + p.id + ":adiak", null) == null) { store.set("history:" + p.id + ":adiak", old); store.del("history:" + p.id); }
+  });
   const DEFAULTS = { key: "", prep: 120, limit: 180, mode: "sections" };
   const settings = () => {
     const s = { ...DEFAULTS, ...store.get("settings", {}) };
@@ -33,18 +67,25 @@
       store.set("profiles", list);
       // köhnə (profilsiz) tarixçə ilk profilə keçir
       const legacy = store.get("history", null);
-      if (legacy && list.length === 1) { store.set("history:" + id, legacy); localStorage.removeItem("adiak.history"); }
+      if (legacy && list.length === 1) { store.set("history:" + id + ":adiak", legacy); store.del("history"); }
     }
     store.set("profile", id);
     renderWho();
   }
   const profileName = () => (profiles().find((p) => p.id === currentProfile()) || {}).name || "";
-  const history = () => store.get("history:" + currentProfile(), []);
-  const setHistory = (h) => store.set("history:" + currentProfile(), h);
+  const history = () => store.get("history:" + currentProfile() + ":" + subjectId, []);
+  const setHistory = (h) => store.set("history:" + currentProfile() + ":" + subjectId, h);
+  // XDİAK kimi fənlərdə qruplar fərqli səviyyədə oxuyur: səviyyə fənnə görə saxlanır
+  const levelOf = () => { const lv = (S().levels || []); return lv.length ? (lv.find((l) => l.id === store.get("level:" + subjectId, null)) || lv[0]) : null; };
+  const historyCount = (pid) => SUBJECTS.reduce((a, x) => a + store.get("history:" + pid + ":" + x.id, []).length, 0);
 
   // ---------- köməkçilər ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+  // etalon cavabın göstərilməsi: səhifə şəkilləri varsa (fizikada düsturlar), onlar; yoxsa mətn
+  const refBody = (q) => q.images && q.images.length
+    ? `<div class="ref shots">${q.images.map((u) => `<img src="${u}" alt="Etalon cavab səhifəsi" loading="lazy">`).join("")}</div>`
+    : `<div class="ref">${md(q.answer)}</div>`;
   const mmss = (sec) => { sec = Math.max(0, Math.round(sec)); return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`; };
   const rand = (n) => Math.floor(Math.random() * n);
   const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
@@ -55,7 +96,7 @@
     setTimeout(() => t.remove(), 3200);
   };
 
-  // Kollokvium cəmi 10 baldır: hər sual 0–10 keyfiyyətlə qiymətləndirilir, payı 1/3-dir.
+  // Kollokvium cəmi 10 baldır: hər sual 0–10 keyfiyyətlə qiymətləndirilir, payı 1/sual sayıdır.
   const one = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
   const examScore = (r) => r.total / r.items.length;            // 0–10 (dəqiq)
   const share = (score, count) => score / count;                // sualın 10 baldakı payı
@@ -68,7 +109,15 @@
     cleanup = [];
     window.scrollTo({ top: 0 });
     if (!currentProfile() && view !== "who") { VIEWS.who(view); return; }
+    if (!subjectId && !["who", "key", "subjects", "settings"].includes(view)) view = "subjects";
+    renderTop();
     VIEWS[view](...args);
+  }
+  const $subj = document.getElementById("subj");
+  function renderTop() {
+    const sub = subjectId && S();
+    $subj.hidden = !sub;
+    $subj.textContent = sub ? `Fənn: ${sub.short}` : "";
   }
   const $who = document.getElementById("who");
   function renderWho() {
@@ -76,6 +125,12 @@
     $who.hidden = !n;
     $who.textContent = n ? `${n} · dəyiş` : "";
   }
+  $subj.addEventListener("click", () => {
+    const inExam = exam && !exam.finished && exam.answers.some(Boolean);
+    if (inExam && !confirm("Bilet yarımçıq qalacaq. Çıxmaq istəyirsən?")) return;
+    exam = null;
+    go("subjects");
+  });
   $who.addEventListener("click", () => {
     const inExam = exam && !exam.finished && exam.answers.some(Boolean);
     if (inExam && !confirm("Bilet yarımçıq qalacaq. Çıxmaq istəyirsən?")) return;
@@ -153,7 +208,7 @@
               ${list.map((p) => `
                 <div class="row" style="flex-wrap:nowrap">
                   <button class="btn ghost" style="flex:1;justify-content:flex-start" data-pick="${esc(p.id)}">${esc(p.name)}
-                    <span class="muted small" style="margin-left:auto">${store.get("history:" + p.id, []).length} bilet</span></button>
+                    <span class="muted small" style="margin-left:auto">${historyCount(p.id)} bilet</span></button>
                   <button class="btn ghost" data-del="${esc(p.id)}" aria-label="Sil" title="Profili sil">✕</button>
                 </div>`).join("")}
             </div>
@@ -175,14 +230,38 @@
         const p = list.find((x) => x.id === b.dataset.del);
         if (!confirm(`"${p.name}" profili və bütün nəticələri silinsin?`)) return;
         store.set("profiles", list.filter((x) => x.id !== p.id));
-        localStorage.removeItem("adiak.history:" + p.id);
-        if (currentProfile() === p.id) { localStorage.removeItem("adiak.profile"); renderWho(); }
+        SUBJECTS.forEach((x) => store.del("history:" + p.id + ":" + x.id));
+        if (currentProfile() === p.id) { store.del("profile"); renderWho(); }
         VIEWS.who(after);
       });
       if (!list.length) input.focus();
     },
 
+    subjects() {
+      const first = esc(profileName().split(" ")[0]);
+      $app.innerHTML = `
+        <section class="fade-in">
+          <h1 style="margin-bottom:6px">${first ? first + ", hansı" : "Hansı"} fənndən bilet çəkirsən?</h1>
+          <p class="muted" style="margin:0 0 22px">Fənni seç. Suallar kafedranın kollokvium siyahısından, etalon cavablar dərs materiallarındandır.</p>
+          <div class="subjects">
+            ${SUBJECTS.map((x) => {
+              const h = store.get("history:" + currentProfile() + ":" + x.id, []);
+              const best = h.length ? one(Math.max(...h.map(examScore))) : null;
+              return `
+              <button class="subject card" data-sub="${x.id}">
+                <span class="subject-tag">${esc(x.short)}</span>
+                <b class="subject-name">${esc(x.name)}</b>
+                <span class="muted small">${x.questions.length} sual · ${esc(x.exam)}</span>
+                <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/10` : "Hələ bilet çəkməmisən"}</span>
+              </button>`;
+            }).join("")}
+          </div>
+        </section>`;
+      $app.querySelectorAll("[data-sub]").forEach((b) => b.onclick = () => { subjectId = b.dataset.sub; store.set("subject", subjectId); go("home"); });
+    },
+
     home() {
+      const sub = S(), N = sub.questions.length;
       const h = history();
       const best = h.length ? one(Math.max(...h.map(examScore))) : null;
       const avg = h.length ? one(h.reduce((a, x) => a + examScore(x), 0) / h.length) : null;
@@ -191,14 +270,19 @@
       $app.innerHTML = `
         <section class="hero fade-in">
           <div>
-            <p class="muted small">Azərbaycan dilində işgüzar və akademik kommunikasiya</p>
+            <p class="muted small">${esc(sub.name)}</p>
             <h1>${esc(profileName().split(" ")[0])}, biletini çək və şifahi cavab ver.</h1>
             <ol class="steps">
-              <li>Bilet çəkirsən: 30 sualdan 3-ü düşür.</li>
+              <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
-              <li>Hər suala ayrıca danışırsan (ən çox ${mmss(s.limit)}).</li>
-              <li>Süni intellekt səsini mətnə çevirir, vəsait əsasında yoxlayır və 10 ballıq kollokvium balı verir.</li>
+              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(s.limit)}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
+              <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və 10 ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və 10 ballıq kollokvium balı verir."}</li>
             </ol>
+            ${(sub.levels || []).length ? `
+              <label class="field" style="max-width:360px;margin:0 0 18px"><span>Qrupunun səviyyəsi</span>
+                <select id="level">${sub.levels.map((l) => `<option value="${l.id}" ${levelOf().id === l.id ? "selected" : ""}>${esc(l.label)}</option>`).join("")}</select>
+                <small>Cavabın bu səviyyəyə görə qiymətləndirilir: səviyyəndən yuxarı söz və qrammatika tələb olunmur, amma leksik və qrammatik səhvlər sayılır.</small>
+              </label>` : ""}
             <div class="row">
               <button class="btn accent" id="start">Bilet çək</button>
               <button class="btn ghost" data-v="bank">Bütün suallar</button>
@@ -212,18 +296,20 @@
               <div class="stat"><span>Orta</span><b>${avg ?? "—"}</b></div>
               <div class="stat"><span>Ən yaxşı</span><b>${best ?? "—"}</b></div>
             </div>
-            <p class="muted small" style="margin:14px 0 6px">Cavablandırdığın suallar: ${covered} / 30</p>
-            <div class="progress"><div style="width:${(covered / 30) * 100}%"></div></div>
+            <p class="muted small" style="margin:14px 0 6px">Cavablandırdığın suallar: ${covered} / ${N}</p>
+            <div class="progress"><div style="width:${(covered / N) * 100}%"></div></div>
             ${h.length ? `<button class="btn ghost" style="margin-top:16px;width:100%" data-v="history">Tarixçəyə bax</button>` : ""}
           </div>
         </section>`;
       $app.querySelector("#start").onclick = () => go("draw");
+      const lvSel = $app.querySelector("#level");
+      if (lvSel) lvSel.onchange = () => store.set("level:" + subjectId, lvSel.value);
       $app.querySelectorAll("[data-v]").forEach((el) => el.addEventListener("click", (e) => { e.preventDefault(); go(el.dataset.v); }));
     },
 
     draw() {
       const s = settings();
-      const pool = shuffle(Array.from({ length: 30 }, (_, i) => i + 1)).slice(0, 10);
+      const pool = shuffle(Array.from({ length: Math.max(S().questions.length, 10) }, (_, i) => i + 1)).slice(0, 10);
       $app.innerHTML = `
         <section class="fade-in">
           <h2>Bileti seç</h2>
@@ -279,8 +365,9 @@
 
     answer(i) {
       const s = settings();
-      const q = byN[exam.qs[i]];
+      const q = qOf(exam.qs[i]);
       const last = i === exam.qs.length - 1;
+      const hint = { problem: "Məsələni addım-addım həll et: düsturu, əvəzləməni və son cavabı (ölçü vahidi ilə) de.", speaking: levelOf() ? `Cavabı ingilis dilində ver. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində ver.", theory: "" }[q.kind] || "";
       $app.innerHTML = `
         <section class="fade-in stack">
           ${paper(i)}
@@ -289,6 +376,7 @@
               <h3 style="margin:0">Sual ${i + 1}: cavabın</h3>
               <button class="link" id="mode-toggle"></button>
             </div>
+            ${hint ? `<p class="muted small" style="margin:0">${hint}</p>` : ""}
             <div id="rec-body"></div>
           </div>
           <div class="row" style="justify-content:flex-end">
@@ -298,7 +386,7 @@
       const body = $app.querySelector("#rec-body");
       const next = $app.querySelector("#next");
       const toggle = $app.querySelector("#mode-toggle");
-      let typing = false;
+      let typing = S().answer === "text" && !exam.answers[i];   // fizika: yazılı, səs istəyə bağlı
       let rec = null;
 
       const setAnswer = (a) => { exam.answers[i] = a; next.disabled = !a; };
@@ -311,7 +399,7 @@
       function draw() {
         toggle.textContent = typing ? "Səslə cavab ver" : "Yazılı cavab ver";
         if (typing) {
-          body.innerHTML = `<textarea id="txt" placeholder="Cavabını bura yaz…"></textarea>`;
+          body.innerHTML = `<textarea id="txt" placeholder="${q.kind === "speaking" ? "Write your answer here…" : q.kind === "problem" ? "Həllini və cavabını bura yaz…" : "Cavabını bura yaz…"}"></textarea>`;
           const ta = body.querySelector("#txt");
           ta.oninput = () => setAnswer(ta.value.trim().length > 20 ? { kind: "text", text: ta.value.trim() } : null);
           ta.focus();
@@ -369,7 +457,7 @@
       $app.innerHTML = `
         <section class="card fade-in stack">
           <div class="row"><div class="spinner"></div><h2 style="margin:0">Qiymətləndirilir…</h2></div>
-          <p class="muted">Səs yazıları mətnə çevrilir və vəsaitdəki cavabla müqayisə olunur. Bu, 20–60 saniyə çəkə bilər.</p>
+          <p class="muted">Səs yazıları mətnə çevrilir və etalonla müqayisə olunur. Bu, 20–60 saniyə çəkə bilər.</p>
           <ul class="checklist">${exam.qs.map((n, i) => `<li id="g${i}"><span class="st">○</span><span>Sual ${i + 1} · №${n}</span></li>`).join("")}</ul>
           <div id="g-actions"></div>
         </section>`;
@@ -378,7 +466,7 @@
         if (exam.results[i]) { mark(i, "✓"); return; }
         mark(i, "…");
         try {
-          exam.results[i] = await gradeOne(byN[n], exam.answers[i], s);
+          exam.results[i] = await gradeOne(qOf(n), exam.answers[i], s);
           mark(i, "✓");
         } catch (err) {
           console.error(err);
@@ -406,8 +494,8 @@
           <div class="card verdict">
             <div class="grade"><div><b>${Math.round(sc)}</b><span>10 baldan</span></div></div>
             <div>
-              <p class="muted small" style="margin:0">Bilet №${rec.ticket} · ${new Date(rec.date).toLocaleString("az-AZ")}</p>
-              <h2 style="margin:4px 0 12px">Kollokvium balı: ${one(sc)} / 10</h2>
+              <p class="muted small" style="margin:0">${esc(S().short)} · Bilet №${rec.ticket} · ${new Date(rec.date).toLocaleString("az-AZ")}</p>
+              <h2 style="margin:4px 0 12px">${esc(S().exam.split(" ·")[0])} balı: ${one(sc)} / 10</h2>
               ${rec.items.map((it, i) => `
                 <div class="scorebar" style="margin-bottom:6px">
                   <span class="small" style="min-width:64px">Sual ${i + 1}</span>
@@ -417,7 +505,7 @@
             </div>
           </div>
           ${rec.items.map((it, i) => {
-            const q = byN[it.n];
+            const q = qOf(it.n);
             return `
             <article class="card stack">
               <div class="row" style="justify-content:space-between;align-items:flex-start">
@@ -429,12 +517,12 @@
               </div>
               <p style="margin:0">${esc(it.feedback)}</p>
               <div class="cols">
-                <div class="good"><h4>Dediklərin</h4><ul>${(it.covered || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
-                <div class="miss"><h4>Çatışmayanlar</h4><ul>${(it.missed || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
+                <div class="good"><h4>${q.kind === "speaking" ? "Yaxşı olanlar" : "Dediklərin"}</h4><ul>${(it.covered || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
+                <div class="miss"><h4>${q.kind === "speaking" ? "Səhvlər və düzəlişlər" : "Çatışmayanlar"}</h4><ul>${(it.missed || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
               </div>
               ${it.speech ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
               <details><summary>Sənin cavabın (mətn)</summary><div class="transcript">${esc(it.transcript || "—")}</div></details>
-              <details><summary>Etalon cavab ${q.src === "vesait" ? "(vəsaitdən)" : "(ümumi məzmun)"}</summary><div class="ref">${md(q.answer)}</div></details>
+              ${q.kind === "speaking" ? "" : `<details><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
             </article>`;
           }).join("")}
           <div class="row">
@@ -452,24 +540,24 @@
       $app.innerHTML = `
         <section class="fade-in">
           <h2>Bütün suallar</h2>
-          <p class="muted">30 sual və etalon cavablar. Rəqəm həmin suala son cavabının keyfiyyətidir (0–10).</p>
+          <p class="muted">${S().questions.length} sual${S().questions.some((q) => q.answer) ? " və etalon cavablar" : ""}. Rəqəm həmin suala son cavabının keyfiyyətidir (0–10).</p>
           <input type="text" class="search" id="q" placeholder="Axtar: məs. etiket, sənəd, təqdimat…">
           <div id="list"></div>
         </section>`;
       const list = $app.querySelector("#list");
       const render = (term) => {
         const t = term.trim().toLocaleLowerCase("az");
-        list.innerHTML = Q.filter((q) => !t || (q.q + " " + q.answer).toLocaleLowerCase("az").includes(t)).map((q) => `
+        list.innerHTML = S().questions.filter((q) => !t || (q.q + " " + q.answer).toLocaleLowerCase("az").includes(t)).map((q) => `
           <details class="bank-item">
             <summary>
               <span class="qn" style="font-family:var(--serif);font-weight:700;color:var(--accent)">${q.n}.</span>
               <span>${esc(q.q)}</span>
               <span class="row" style="gap:6px;flex-wrap:nowrap">
                 ${last[q.n] != null ? `<span class="pill small" style="color:${scoreColor(last[q.n])}">${last[q.n]}</span>` : ""}
-                <span class="tag">${q.src === "vesait" ? "vəsait" : "ümumi"}</span>
+                ${q.kind === "speaking" ? `<span class="tag">speaking</span>` : `<span class="tag">${SRC[q.src]}</span>`}
               </span>
             </summary>
-            <div class="ref">${md(q.answer)}</div>
+            ${q.kind === "speaking" ? `<div class="ref"><p class="muted">Bu sual üçün etalon cavab yoxdur: sərbəst danışırsan. Qiymətləndirmə məzmun, qrammatika, lüğət və axıcılığa görədir.</p></div>` : refBody(q)}
           </details>`).join("") || `<p class="muted">Heç nə tapılmadı.</p>`;
       };
       $app.querySelector("#q").oninput = (e) => render(e.target.value);
@@ -481,7 +569,7 @@
       $app.innerHTML = `
         <section class="fade-in">
           <h2>Tarixçə</h2>
-          <p class="muted">${esc(profileName())} profilinin nəticələri.</p>
+          <p class="muted">${esc(profileName())} · ${esc(S().short)} nəticələri.</p>
           ${h.length ? h.map((r, idx) => {
             return `
             <div class="hist">
@@ -514,8 +602,8 @@
           </label>
           <label class="field"><span>Biletin tərtibi</span>
             <select id="mode">
-              <option value="sections" ${s.mode === "sections" ? "selected" : ""}>Hər bölmədən bir sual (1–10, 11–20, 21–30)</option>
-              <option value="random" ${s.mode === "random" ? "selected" : ""}>Tam təsadüfi 3 sual</option>
+              <option value="sections" ${s.mode === "sections" ? "selected" : ""}>Hər bölmədən bir sual (fənnin biletinə uyğun)</option>
+              <option value="random" ${s.mode === "random" ? "selected" : ""}>Tam təsadüfi suallar</option>
               <option value="weak" ${s.mode === "weak" ? "selected" : ""}>Zəif və cavablanmamış suallara üstünlük</option>
             </select>
           </label>
@@ -542,21 +630,22 @@
   }
 
   function pickQuestions(mode) {
-    const all = Q.map((q) => q.n);
-    if (mode === "random") return shuffle(all).slice(0, 3).sort((a, b) => a - b);
+    const sub = S(), T = sub.ticket.length;
+    const all = sub.questions.map((q) => q.n);
+    if (mode === "random") return shuffle(all).slice(0, T).sort((a, b) => a - b);
     if (mode === "weak") {
       const last = lastScores();
       // cavablanmamış = 0 bal kimi; çəki: 11 - bal
       const weight = (n) => 11 - (last[n] ?? 0);
       const picked = [];
-      while (picked.length < 3) {
+      while (picked.length < T) {
         const pool = all.filter((n) => !picked.includes(n));
         let r = Math.random() * pool.reduce((a, n) => a + weight(n), 0);
         for (const n of pool) { r -= weight(n); if (r <= 0) { picked.push(n); break; } }
       }
       return picked.sort((a, b) => a - b);
     }
-    return [1 + rand(10), 11 + rand(10), 21 + rand(10)];
+    return sub.ticket.map((g) => { const pool = sub.questions.filter((q) => q.group === g); return pool[rand(pool.length)].n; });
   }
 
   function lastScores() {
@@ -578,13 +667,13 @@
       <div class="paper">
         <div class="paper-head">
           <span class="no">Bilet № ${exam.ticket}</span>
-          <span class="muted small">ADİAK · Kollokvium</span>
+          <span class="muted small">${esc(S().short)} · ${esc(S().exam)}</span>
         </div>
         <ol class="qlist">
           ${exam.qs.map((n, i) => `
             <li class="${!all && i === active ? "active" : ""} ${!all && i < active ? "done" : ""}">
               <span class="qn">${i + 1}.</span>
-              <span class="qtext">${esc(byN[n].q)}</span>
+              <span class="qtext">${esc(qOf(n).q)}</span>
             </li>`).join("")}
         </ol>
       </div>`;
@@ -686,13 +775,14 @@
     }
   }
 
+  const lvQ = () => (levelOf() ? `&lv=${levelOf().id}` : "");
   async function gradeOne(q, answer, s) {
     if (!answer) return { transcript: "", score: 0, covered: [], missed: ["Cavab verilmədi"], feedback: "Bu suala cavab verilmədi.", speech: "" };
     if (answer.kind === "audio") {
       if (!answer.wav) answer.wav = await toWav(answer.blob); // təkrar cəhddə yenidən çevirmə
-      return api(`n=${q.n}&kind=audio`, answer.wav, "audio/wav", s);
+      return api(`s=${subjectId}&n=${q.n}&kind=audio${lvQ()}`, answer.wav, "audio/wav", s);
     }
-    return api(`n=${q.n}&kind=text`, answer.text, "text/plain; charset=utf-8", s);
+    return api(`s=${subjectId}&n=${q.n}&kind=text${lvQ()}`, answer.text, "text/plain; charset=utf-8", s);
   }
 
   // ---------- açar forması (istəyə bağlı) ----------
@@ -726,8 +816,9 @@
   }
 
   renderWho();
+  subjectId = SUBJECTS.some((x) => x.id === store.get("subject", null)) ? store.get("subject") : null;
   // serverdə ümumi açar olub-olmadığını öyrən, sonra başla
   let shared = false;
   const needKey = () => !shared && !settings().key;
-  fetch("/api/grade").then((r) => r.json()).then((d) => { shared = !!d.shared; }).catch(() => {}).finally(() => go("home"));
+  fetch("/api/grade").then((r) => r.json()).then((d) => { shared = !!d.shared; }).catch(() => {}).finally(() => go(subjectId ? "home" : "subjects"));
 })();

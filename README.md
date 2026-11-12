@@ -1,93 +1,57 @@
 <div align="center">
 
-<img src="docs/hero.png" alt="ADİAK Bilet" width="100%">
+# Bilet Çək
 
-# ADİAK Bilet
+**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 10 ballıq qiymət al.**
 
-**Kollokvium biletini çək, 3 suala səsli cavab ver, 10 ballıq qiymət al.**
-
-[![Canlı sayt](https://img.shields.io/badge/canlı-adiak--bilet.vercel.app-7a2a2a?style=flat-square)](https://adiak-bilet.vercel.app)
-[![Vercel](https://img.shields.io/badge/deploy-Vercel-1f2226?style=flat-square)](https://vercel.com)
+[![Canlı sayt](https://img.shields.io/badge/canlı-bilet--cek.vercel.app-7a2a2a?style=flat-square)](https://bilet-cek.vercel.app)
 [![Gemini](https://img.shields.io/badge/AI-Gemini-4a4f57?style=flat-square)](https://aistudio.google.com)
 
-**[Saytı aç →](https://adiak-bilet.vercel.app)**
+**[Saytı aç →](https://bilet-cek.vercel.app)**
 
 </div>
 
 ---
 
-AzTU-da "Azərbaycan dilində işgüzar və akademik kommunikasiya" (ADİAK) fənni üzrə kollokvium şifahi keçirilir: 30 suallıq siyahıdan bilet çəkilir, düşən üç suala tələbə şifahi cavab verir. Bu sayt həmin imtahanı evdə sınamaq üçündür. Real bilet çəkirsən, hər suala **səslə** cavab verirsən, sonda süni intellekt cavabını dərs materialı ilə müqayisə edib **10 ballıq kollokvium balı** verir.
+Əvvəl yalnız ADİAK kollokviumu üçün idi (`adiak-bilet`), indi bütün fənlər üçün ümumidir. Fənni seçirsən, real biletdəki kimi suallar düşür, cavabını **səslə və ya yazılı** verirsən, sonra süni intellekt cavabı etalonla müqayisə edib qiymət verir.
 
-## Necə işləyir
+## Fənlər
 
-<table>
-<tr>
-<td width="25%" align="center"><img src="docs/draw.png" alt="Bilet çək"><br><b>1. Bilet çək</b><br><sub>10 bilet masadadır, birini götürürsən. 30 sualdan 3-ü düşür.</sub></td>
-<td width="25%" align="center"><img src="docs/record.png" alt="Səsli cavab"><br><b>2. Danış</b><br><sub>Hər suala ayrıca, mikrofonla cavab verirsən. İstəsən yazılı da olar.</sub></td>
-<td width="25%" align="center"><img src="docs/result.png" alt="Nəticə"><br><b>3. Bal al</b><br><sub>Kollokvium balı 10 üzərindən, hər sual üçün rəy və çatışmayan fikirlər.</sub></td>
-<td width="25%" align="center"><img src="docs/key.png" alt="API açarı"><br><b>4. Öz açarın</b><br><sub>Pulsuz Gemini açarını addım-addım izahla bir dəqiqəyə alırsan.</sub></td>
-</tr>
-</table>
+| Fənn | Sual növü | Cavab forması | Qiymətləndirmə |
+|---|---|---|---|
+| **ADİAK** | 30 nəzəri sual (hər onluqdan 1) | səslə (yazılı da olar) | etalon cavabla müqayisə |
+| **Fizika** | 19 nəzəri sual + 10 məsələ | yazılı (səslə də olar) | nəzəriyyədə etalonla, məsələdə düzgün həll və cavabla |
+| **XDİAK** (ingilis dili) | 25 speaking mövzusu | səslə (yazılı da olar) | qrupun **səviyyəsinə** görə: Elementary-dən Upper-Intermediate-ə; leksik və qrammatik səhvlər sayılır, səviyyədən yuxarı söz tələb olunmur |
 
-```mermaid
-flowchart LR
-    A[Bilet çək] --> B[3 sual]
-    B --> C[Mikrofon: hər suala ayrıca cavab]
-    C --> D[WAV-a çevir<br/>brauzerdə]
-    D --> E[/api/grade<br/>Vercel funksiyası/]
-    E --> F[Gemini:<br/>səs → mətn + etalonla müqayisə]
-    F --> G[Kollokvium balı<br/>10 üzərindən]
-```
+Yeni fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
 
 ## Xüsusiyyətlər
 
-- **Real imtahan hissi:** bilet çəkmə animasiyası, hazırlıq vaxtı (0–10 dəq), hər suala danışma limiti (2–4 dəq).
-- **Səsli cavab:** brauzerdə yazılır və WAV-a çevrilir. Fayl Vercel-in 4.5 MB limitinə sığsın deyə tezlik (8–16 kHz) cavabın uzunluğuna görə seçilir.
-- **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı Azərbaycan dilində mətnə çevirir, həm də etalon cavabla müqayisə edir. Brauzerin öz nitq tanıması (Web Speech API) istifadə olunmur, çünki iPhone Safari Azərbaycan dilini tanımır.
-- **10 ballıq sistem:** kollokvium cəmi 10 baldır. Hər sual 0–10 keyfiyyət balı alır, 3 sualın ortalaması kollokvium balı olur (hər sualın payı 3.3).
-- **Ətraflı rəy:** düzgün dediyin fikirlər, çatışmayanlar, qısa rəy və nitq mədəniyyəti haqqında qeyd. Transkriptə və etalon cavaba baxa bilərsən.
-- **Profillər:** eyni cihazdan bir neçə nəfər işlədə bilər, nəticələr ada görə ayrı saxlanır.
-- **Tarixçə və zəif suallar:** hər sualın son balı yadda qalır. "Zəif suallara üstünlük" rejimi aşağı bal aldığın və hələ cavablamadığın sualları tez-tez çıxarır.
-- **Sual bankı:** 30 sual və etalon cavablar axtarışla oxunur.
-- **Telefon və kompüter:** mobil üçün yazılıb, mikrofon iPhone Safari və Chrome-da işləyir.
-
-<details>
-<summary><b>Masaüstü görünüşü</b></summary>
-<br>
-<img src="docs/desktop-home.png" alt="Masaüstü" width="100%">
-</details>
-
-## Məxfilik və arxitektura
-
-- Nəticələr və profillər yalnız **sənin brauzerində** (localStorage) saxlanır. Serverdə verilənlər bazası yoxdur.
-- Hər istifadəçi **öz pulsuz Gemini açarını** işlədir. Açar brauzerdə saxlanır və yalnız qiymətləndirmə sorğusu ilə bu saytın serverinə göndərilir, kodda açar yoxdur.
-- `/api/grade` funksiyası etalon cavabı və promptu serverdə qurur, ona görə etalon cavab qiymətləndirmə zamanı brauzerə ötürülmür. İstəsən, Vercel-də `GEMINI_API_KEY` mühit dəyişəni qoyub ümumi açar da verə bilərsən.
-- Gemini limiti dolsa, server avtomatik ehtiyat modelə keçir (`gemini-3.5-flash-lite` → `gemini-3.1-flash-lite`).
+- **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı, hər suala vaxt limiti.
+- **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı mətnə çevirir, həm qiymətləndirir. Brauzerin nitq tanıması işlədilmir (iPhone Safari Azərbaycan dilini tanımır).
+- **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
+- **10 ballıq sistem:** hər sual 0–10 qiymət alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı ortalamadır.
+- **Ətraflı rəy:** düzgün fikirlər, çatışmayanlar (ingilis dilində: səhvlər və düzəlişlər), nitq qeydi.
+- **Profillər, tarixçə, zəif suallar:** nəticələr fənnə görə ayrı saxlanır; "zəif suallara üstünlük" rejimi.
+- **Məxfilik:** nəticələr yalnız sənin brauzerindədir. Hər istifadəçi öz pulsuz Gemini açarını işlədir; açar kodda yoxdur.
 
 ## Texnologiyalar
 
-Build addımı yoxdur: sadə **HTML + CSS + JavaScript** (framework yoxdur), **Vercel Functions** (Node 20+), **MediaRecorder / Web Audio API**, **Gemini API** (strukturlu JSON cavab).
-Dizayn: mat kağız tonları, bordo vurğu, Source Serif 4 + Inter, parıltı və neon effekt yoxdur.
+Build addımı yoxdur: sadə HTML + CSS + JavaScript, **Vercel Functions** (Node 20+), MediaRecorder / Web Audio API, Gemini API (strukturlu JSON cavab, ehtiyat model).
 
 ## Fayllar
 
 ```
-index.html, style.css, app.js     sayt (build lazım deyil)
-api/grade.js                      Vercel funksiyası: prompt, Gemini sorğusu, ehtiyat model
-questions.example.js              30 rəsmi sual, etalon cavab yerində nümunə mətn
+index.html, style.css, app.js     sayt
+api/grade.js                      Vercel funksiyası: sual növünə görə prompt, Gemini sorğusu
+build_subjects.py                 mənbə fayllardan (docx, md, pdf) subjects.js və api/_data.js yaradır
+subjects.example.js               fənn məlumatının nümunəsi
 api/_data.example.js              eyni məlumat, server üçün
-build_questions.py                sual docx-ini və cavab .md faylını oxuyub yuxarıdakıları yaradır
-docs/                             README şəkilləri
 ```
 
-> **Qeyd:** real etalon cavablar (`questions.js`, `api/_data.js`) dərs vəsaitinə əsaslandığı üçün bu repo-da yoxdur. Nümunə fayllarla sayt işləyir, cavabları öz materialına görə doldurmaq lazımdır.
+> Real etalon cavablar (`subjects.js`, `api/_data.js`, `answers/`) dərs materiallarına əsaslandığı üçün bu repo-da yoxdur.
 
 ## Özün işə salmaq
 
-1. Nümunə faylları köçür və cavabları öz materialına görə yaz:
-   ```bash
-   cp questions.example.js questions.js
-   cp api/_data.example.js api/_data.js
-   ```
-2. Yerli işə salma (funksiya ilə birlikdə): `npx vercel dev`.
-3. Yerləşdirmə: `npx vercel --prod`. Mikrofon yalnız HTTPS-də işləyir, Vercel ünvanı bunu təmin edir.
+1. `cp subjects.example.js subjects.js` və `cp api/_data.example.js api/_data.js`, ya da `python build_subjects.py` (öz mənbə fayllarınla).
+2. Yerli: `npx vercel dev`. Yerləşdirmə: `npx vercel --prod`. Mikrofon yalnız HTTPS-də işləyir.

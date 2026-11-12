@@ -1,4 +1,7 @@
-build_questions.py
+.vercel
+.env*
+build_subjects.py
 __pycache__
 docs
 README.md
+content

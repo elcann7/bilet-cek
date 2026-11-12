@@ -1,5 +1,11 @@
 __pycache__/
 .vercel/
-# real etalon cavablar (dərs vəsaitindən), repo-ya düşmür
-questions.js
+.env*
+# real etalon cavablar və dərs materialları, repo-ya düşmür
+subjects.js
 api/_data.js
+answers/
+content/
+
+.vercel
+.env*
