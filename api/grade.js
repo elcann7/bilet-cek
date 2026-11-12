@@ -17,6 +17,7 @@ const SCHEMA = {
     missed: { type: "array", items: { type: "string" } },
     feedback: { type: "string" },
     speech: { type: "string" },
+    corrected: { type: "string" },
   },
   required: ["transcript", "score", "covered", "missed", "feedback", "speech"],
 };
@@ -43,12 +44,13 @@ TASK ${q.n}: ${q.q}
 
 Do this:
 1. transcript: ${kind === "audio" ? "Transcribe the audio LITERALLY, word for word, in English, keeping the student's grammar and word-choice mistakes exactly as spoken (do not correct, smooth or complete anything; if a word was mispronounced so that it sounds like another word, write what was said and add [unclear] if unsure). If the recording is empty or unintelligible, say so." : "Return the student's text as it is, with all its mistakes."}
-2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one. In this colloquium the student gets ONE speaking task and is expected to give a long, developed answer (about 2–4 minutes of speech, i.e. a full paragraph or more: explanation, reasons, examples). An answer that is much too short for this (for example only 3–4 simple sentences) must lose points under task fulfilment and development, even if it is correct; what counts as long enough is judged by the level (elementary: about 10 simple sentences are enough).
+2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one. In this colloquium the student gets ONE speaking task and is expected to give a long, developed answer (about 2–4 minutes of speech, i.e. a full paragraph or more: explanation, reasons, examples). An answer that is much too short for this (for example only 4–6 simple sentences, under about 100 words) must lose points under task fulfilment and development, even if it is correct. What counts as long enough depends on the level: roughly 150+ words (12–15 simple sentences) for elementary, 200+ for pre-intermediate, 250+ for intermediate, 300+ for upper-intermediate. Answers clearly below that lose points; well-developed answers at or above it do not lose points for length.
 3. score (0–10): 9–10 = answers fully, well organised, few minor errors; 7–8 = answers clearly, some errors that do not block meaning; 5–6 = understandable but simple or with frequent errors; 3–4 = very limited, hard to follow; 1–2 = a few words/phrases; 0 = no answer or off-topic.
 4. covered: what the student did well (short phrases, in Azerbaijani). missed: the mistakes found in the transcript, at most 8, most important first, each in the form: "[qrammatika] dedin: ... → düzgünü: ..." or "[leksika] dedin: ... → düzgünü: ..." (quote the student's exact words, give the correct English, add a very short explanation in Azerbaijani when needed). If there are no real mistakes, return an empty list.
 5. feedback: 2–3 sentences in Azerbaijani addressed to the student ("sən"): what was good and what to do to raise the score.
 6. speech: 1 sentence in Azerbaijani about fluency and pronunciation (hesitations, filler words, sentence variety).
-Write covered/missed/feedback/speech in Azerbaijani; keep quoted English as English.`;
+7. corrected: rewrite the student's WHOLE answer as it should have been said: same ideas, same order and same structure, in the same spoken style and at the same level (use words and grammar the student could realistically use), but with EVERY grammar and vocabulary mistake fixed and obvious gaps in sentences completed. Do not add new ideas, do not make it fancier than the student's level, do not shorten it. Keep the student's correct sentences unchanged. Plain text, paragraphs separated by a blank line. If the transcript is empty, return an empty string.
+Write covered/missed/feedback/speech in Azerbaijani; keep quoted English and the "corrected" text as English.`;
   }
   const problem = q.kind === "problem";
   return `Sən Azərbaycan Texniki Universitetində "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.
@@ -78,14 +80,16 @@ const SAMPLE_SCHEMA = {
   properties: { sample: { type: "string" }, phrases: { type: "array", items: { type: "string" } } },
   required: ["sample", "phrases"],
 };
-const WORDS = { elementary: "130–170", preint: "170–220", inter: "220–290", upper: "290–360" };
+// 2–4 dəqiqəlik danışıq ≈ 120–150 söz/dəq. Minimum söz sayı: bundan qısa gələrsə, nümunə bir dəfə yenidən yazdırılır.
+const WORDS = { elementary: [200, 260], preint: [250, 320], inter: [300, 400], upper: [350, 450] };
+const wc = (t) => String(t || "").trim().split(/\s+/).filter(Boolean).length;
 const SAMPLE_PROMPT = (subj, q, level, v) => `You are an English teacher writing a MODEL ANSWER for a university speaking colloquium (course: "${subj.name}"). Students will read it to learn how such an answer sounds.
 
 SPEAKING TASK: ${q.q}
 
 STUDENT LEVEL: ${level ? `${level.label}. ${level.desc}` : "A2–B1"}
 
-Write the model answer exactly as a student of THIS level could realistically say it out loud in about 2–3 minutes (${WORDS[level && level.id] || "170–220"} words):
+Write the model answer exactly as a student of THIS level could realistically say it out loud in about 2–3 minutes at a normal speaking pace (${(WORDS[level && level.id] || [250, 320]).join("–")} words, NEVER fewer than ${(WORDS[level && level.id] || [250, 320])[0]}; count them):
 - natural spoken English, first person, with simple linking words (first of all, because, for example, also, in conclusion);
 - use ONLY grammar and vocabulary appropriate for this level; no rare or C-level words for lower levels; absolutely no grammar or spelling mistakes;
 - a clear structure: short opening, 2–3 developed ideas with reasons and a personal example each, short closing;
@@ -161,7 +165,15 @@ export async function POST(request) {
     if (q.kind !== "speaking") return json(400, { error: "Nümunə cavab yalnız speaking üçündür" });
     const lv = (subj.levels || []).find((l) => l.id === url.searchParams.get("lv")) || (subj.levels || [])[0];
     const v = Math.max(1, Math.min(20, Number(url.searchParams.get("v")) || 1));
-    const rs = await callGemini(key, [{ text: SAMPLE_PROMPT(subj, q, lv, v) }], SAMPLE_SCHEMA, 0.9);
+    const min = (WORDS[lv && lv.id] || [250, 320])[0];
+    let rs = await callGemini(key, [{ text: SAMPLE_PROMPT(subj, q, lv, v) }], SAMPLE_SCHEMA, 0.9);
+    if (rs.ok && wc(rs.ok.sample) < min * 0.85) {  // model qısa yazdısa, bir dəfə uzun variant istə
+      const short = wc(rs.ok.sample);
+      const again = await callGemini(key, [{ text: SAMPLE_PROMPT(subj, q, lv, v) + `
+
+IMPORTANT: your previous attempt had only ${short} words, which is far too short (about ${Math.round(short / 2.2)} seconds of speech). Write at least ${min} words: develop every idea with a reason AND a concrete personal example, add more detail and linking sentences.` }], SAMPLE_SCHEMA, 0.9);
+      if (again.ok && wc(again.ok.sample) > short) rs = again;
+    }
     return rs.ok ? json(200, rs.ok) : json(rs.status, { error: rs.error });
   }
 

@@ -562,6 +562,7 @@
                 <div class="miss"><h4>${q.kind === "speaking" ? "Səhvlər və düzəlişlər" : "Çatışmayanlar"}</h4><ul>${(it.missed || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
               </div>
               ${it.speech ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
+              ${it.corrected ? `<div class="corrected"><h4>Necə deməli idin <span class="muted small">(sənin cavabın, bütün səhvlər düzəldilmiş)</span></h4><div class="ref">${md(it.corrected)}</div></div>` : ""}
               <details><summary>Sənin cavabın (mətn)</summary><div class="transcript">${esc(it.transcript || "—")}</div></details>
               ${q.kind === "speaking" ? sampleBlock(q) : `<details><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
             </article>`;
