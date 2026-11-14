@@ -577,12 +577,12 @@
         <section class="hero fade-in">
           <div>
             <p class="muted small">${esc(sub.name)}</p>
-            <h1>${esc(profileName().split(" ")[0])}, biletini çək və şifahi cavab ver.</h1>
+            <h1>${esc(profileName().split(" ")[0])}, biletini çək və cavab ver.</h1>
             <ol class="steps">
               <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
               <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(limitFor(s))}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
-              <li>${sub.questions.some((q) => q.kind === "speaking") ? "Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir." : "Süni intellekt səsini mətnə çevirir, etalon cavabla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir."}</li>
+              <li>${sub.questions.some((q) => q.kind === "speaking") ? `Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir.` : `Süni intellekt cavabını etalonla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir.`}</li>
             </ol>
             ${sub.sets ? `
               <label class="field" style="max-width:420px;margin:0 0 14px"><span>Qrupun sual siyahısı</span>

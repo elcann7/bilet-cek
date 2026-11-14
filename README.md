@@ -1,10 +1,13 @@
 <div align="center">
 
+<img src="docs/hero.png" alt="Bilet Çək" width="100%">
+
 # Bilet Çək
 
-**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 10 ballıq kollokvium balı al.**
+**Kollokvium və imtahan biletini çək, cavab ver, süni intellektdən 10 ballıq qiymət al.**
 
 [![Canlı sayt](https://img.shields.io/badge/canlı-bilet--cek.vercel.app-7a2a2a?style=flat-square)](https://bilet-cek.vercel.app)
+[![Vercel](https://img.shields.io/badge/deploy-Vercel-1f2226?style=flat-square)](https://vercel.com)
 [![Gemini](https://img.shields.io/badge/AI-Gemini-4a4f57?style=flat-square)](https://aistudio.google.com)
 
 **[Saytı aç →](https://bilet-cek.vercel.app)**
@@ -13,7 +16,29 @@
 
 ---
 
-Bütün universitet fənləri üçün ümumi kollokvium və imtahan simulyatoru. **Hər kəs öz fənnini əlavə edə bilər:** sual PDF-ni, Word faylını və ya mətnini yüklə, sistem ondan sualları çıxarıb sənin üçün ayrıca sınaq yaradır (aşağıda "Öz sınağını yarat"). Fayl serverə göndərilmir, yalnız sənin brauzerində qalır. Fənni seçirsən, real biletdəki kimi suallar düşür, cavabını **səslə və ya yazılı** verirsən, sonra süni intellekt cavabı etalonla müqayisə edib qiymət verir.
+Universitetdə kollokvium günü sual siyahısından bilet çəkilir və cavab verilir. Bu sayt həmin anı evdə sınamaq üçündür: fənni seçirsən, real biletdəki kimi suallar düşür, cavabını **səslə və ya yazılı** verirsən, sonra süni intellekt cavabı etalonla müqayisə edib qiymət və ətraflı rəy verir.
+
+**Hər kəs öz fənnini əlavə edə bilər.** Sual PDF-ni, Word faylını və ya mətnini yüklə: sistem ondan sualları çıxarıb sənin üçün ayrıca sınaq yaradır. Fayl serverə göndərilmir, yalnız sənin brauzerində qalır.
+
+## Necə işləyir
+
+<table>
+<tr>
+<td width="25%" align="center"><img src="docs/home.png" alt="Fənn seç"><br><b>1. Fənni seç</b><br><sub>Hazır fənlər və ya öz yaratdığın sınaq.</sub></td>
+<td width="25%" align="center"><img src="docs/draw.png" alt="Bilet çək"><br><b>2. Bilet çək</b><br><sub>Masada 10 bilet var, birini götürürsən.</sub></td>
+<td width="25%" align="center"><img src="docs/question.png" alt="Cavab ver"><br><b>3. Cavab ver</b><br><sub>Hər suala ayrıca, səslə və ya yazılı. Kod tapşırıqları kod bloku ilə göstərilir.</sub></td>
+<td width="25%" align="center"><img src="docs/result.png" alt="Nəticə"><br><b>4. Bal al</b><br><sub>Kollokvium balı 10 üzərindən, hər sual üçün rəy və çatışmayanlar.</sub></td>
+</tr>
+</table>
+
+```mermaid
+flowchart LR
+    A[Fənni seç] --> B[Bilet çək]
+    B --> C[Hər suala cavab:<br/>səslə və ya yazılı]
+    C --> D[/api/grade<br/>Vercel funksiyası/]
+    D --> E[Gemini:<br/>etalonla müqayisə]
+    E --> F[Kollokvium balı<br/>10 üzərindən]
+```
 
 ## Fənlər
 
@@ -43,15 +68,28 @@ Etalon cavab məcburi deyil: olmasa, süni intellekt öz fənn biliyinə görə 
 
 - **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı, hər suala vaxt limiti.
 - **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı mətnə çevirir, həm qiymətləndirir. Brauzerin nitq tanıması işlədilmir (iPhone Safari Azərbaycan dilini tanımır).
-- **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
-- **Kollokvium 10 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamanın 10-a çevrilməsidir. Fənn üzrə dəyişmək üçün `max` sahəsi var.
+- **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ və ya kod tapşırığı (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
+- **Kollokvium 10 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamadır. Fənn üzrə dəyişmək üçün `max` sahəsi var.
 - **Ətraflı rəy:** düzgün fikirlər, çatışmayanlar (ingilis dilində: səhvlər və düzəlişlər), nitq qeydi.
 - **Profillər, tarixçə, zəif suallar:** nəticələr fənnə görə ayrı saxlanır; "zəif suallara üstünlük" rejimi.
-- **Məxfilik:** nəticələr yalnız sənin brauzerindədir. Hər istifadəçi öz pulsuz Gemini açarını işlədir; açar kodda yoxdur.
+- **Telefon və kompüter:** mobil üçün yazılıb, masaüstündə də rahat işləyir.
+
+<details>
+<summary><b>Masaüstü görünüşü</b></summary>
+<br>
+<img src="docs/desktop-home.png" alt="Masaüstü" width="100%">
+</details>
+
+## Məxfilik və arxitektura
+
+- Nəticələr, profillər və öz fənlərin yalnız **sənin brauzerində** (localStorage) saxlanır. Serverdə verilənlər bazası yoxdur.
+- Hər istifadəçi **öz pulsuz Gemini açarını** işlədir. Açar brauzerdə saxlanır və yalnız qiymətləndirmə sorğusu ilə bu saytın serverinə göndərilir, kodda açar yoxdur.
+- `/api/grade` funksiyası etalon cavabı və promptu serverdə qurur, ona görə hazır fənlərin etalon cavabı qiymətləndirmə zamanı brauzerə ötürülmür.
+- Gemini limiti dolsa, server avtomatik ehtiyat modelə keçir.
 
 ## Texnologiyalar
 
-Build addımı yoxdur: sadə HTML + CSS + JavaScript, **Vercel Functions** (Node 20+), MediaRecorder / Web Audio API, Gemini API (strukturlu JSON cavab, ehtiyat model).
+Build addımı yoxdur: sadə **HTML + CSS + JavaScript** (framework yoxdur), **Vercel Functions** (Node 20+), **MediaRecorder / Web Audio API**, **Gemini API** (strukturlu JSON cavab). Dizayn: mat kağız tonları, bordo vurğu, parıltı və neon effekt yoxdur.
 
 ## Fayllar
 
@@ -61,9 +99,10 @@ api/grade.js                      Vercel funksiyası: sual növünə görə prom
 build_subjects.py                 mənbə fayllardan (docx, md, pdf) subjects.js və api/_data.js yaradır
 subjects.example.js               fənn məlumatının nümunəsi
 api/_data.example.js              eyni məlumat, server üçün
+docs/                             README şəkilləri
 ```
 
-> Real etalon cavablar (`subjects.js`, `api/_data.js`, `answers/`) dərs materiallarına əsaslandığı üçün bu repo-da yoxdur.
+> Real etalon cavablar (`subjects.js`, `api/_data.js`, `answers/`) dərs materiallarına əsaslandığı üçün bu repo-da yoxdur. Nümunə fayllarla sayt işləyir, cavabları öz materialına görə doldurmaq lazımdır.
 
 ## Özün işə salmaq
 
