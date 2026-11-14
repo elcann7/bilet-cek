@@ -157,7 +157,16 @@
 
   // ---------- köməkçilər ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-  const md = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+  // kod blokları: ```...``` → <pre class="code">, `...` → <code>
+  const inl = (h) => h.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  const CODE = /```\n?([\s\S]*?)```/;
+  const md = (s) => esc(s).split(CODE).map((seg, i) => i % 2
+    ? `<pre class="code">${seg.replace(/\n$/, "")}</pre>`
+    : inl(seg).split(/\n{2,}/).filter((p) => p.trim()).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")).join("");
+  // sual mətni: kod blokları varsa <pre>, qalanı sətir qırılması ilə
+  const qh = (s) => esc(s).split(CODE).map((seg, i) => i % 2
+    ? `<pre class="code">${seg.replace(/\n$/, "")}</pre>`
+    : inl(seg).replace(/\n/g, "<br>")).join("");
   // etalon cavabın göstərilməsi: səhifə şəkilləri varsa (fizikada düsturlar), onlar; yoxsa mətn
   const refBody = (q) => !q.answer && !(q.images && q.images.length)
     ? `<div class="ref"><p class="muted small">Bu sual üçün etalon cavab yüklənməyib: qiymətləndirmə süni intellektin öz fənn biliyinə əsaslanır. Redaktədə etalon cavab əlavə edə bilərsən.</p></div>`
@@ -207,9 +216,9 @@
     setTimeout(() => t.remove(), 3200);
   };
 
-  // Kollokvium cəmi 20 baldır (fənn üzrə dəyişə bilər: subject.max). Hər sual 0–10 keyfiyyətlə qiymətləndirilir,
-  // biletin balı keyfiyyətin ortalamasının 20-yə çevrilməsidir; hər sualın payı max / sual sayıdır.
-  const maxOf = () => (S() && S().max) || 20;
+  // Kollokvium cəmi 10 baldır (fənn üzrə dəyişə bilər: subject.max). Hər sual 0–10 keyfiyyətlə qiymətləndirilir,
+  // biletin balı keyfiyyətin ortalamasının 10-a çevrilməsidir; hər sualın payı max / sual sayıdır.
+  const maxOf = () => (S() && S().max) || 10;
   const pts = (q10) => (q10 / 10) * maxOf();                      // 0–10 keyfiyyət → kollokvium balı
   const one = (x) => (Math.round(x * 10) / 10).toFixed(1).replace(/\.0$/, "");
   const answeredOf = (r) => r.items.filter((i) => !i.skipped);   // "etalona bax" seçilənlər balda sayılmır
@@ -356,12 +365,12 @@
       const first = esc(profileName().split(" ")[0]);
       const card = (x) => {
         const h = store.get("history:" + currentProfile() + ":" + x.id, []);
-        const best = h.length ? one((Math.max(...h.map(examScore)) / 10) * (x.max || 20)) : null;
+        const best = h.length ? one((Math.max(...h.map(examScore)) / 10) * (x.max || 10)) : null;
         const inner = `
           <span class="subject-tag">${esc(x.short)}</span>
           <b class="subject-name">${esc(x.name)}</b>
           <span class="muted small">${qsOf(x).length} sual · ${esc(x.exam)}</span>
-          <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 20}` : "Hələ bilet çəkməmisən"}</span>`;
+          <span class="subject-foot small">${h.length ? `${h.length} bilet · ən yaxşı ${best}/${x.max || 10}` : "Hələ bilet çəkməmisən"}</span>`;
         return x.custom
           ? `<div class="subject card custom"><button class="subject-open" data-sub="${x.id}">${inner}</button>
                <div class="row small subject-actions"><span class="tag">sənin fənnin</span><button class="link" data-cedit="${x.id}">Redaktə</button><button class="link" data-cexp="${x.id}">Paylaş</button><button class="link" data-cdel="${x.id}">Sil</button></div></div>`
@@ -420,7 +429,7 @@
       const ex = editId && SUBJECTS.find((x) => x.id === editId && x.custom);
       const d = ex
         ? { id: ex.id, name: ex.name, short: ex.short, exam: ex.exam, lang: ex.lang, answer: ex.answer, kindDefault: ex.kindDefault, per: ex.per, max: ex.max, limit: ex.limit, questions: ex.questions.map((q) => ({ q: q.q, kind: q.kind, answer: q.answer })) }
-        : { id: "u_" + Math.random().toString(36).slice(2, 9), name: "", short: "", exam: "Kollokvium", lang: "az", answer: "voice", kindDefault: "theory", per: 3, max: 20, limit: 180, questions: [] };
+        : { id: "u_" + Math.random().toString(36).slice(2, 9), name: "", short: "", exam: "Kollokvium", lang: "az", answer: "voice", kindDefault: "theory", per: 3, max: 10, limit: 180, questions: [] };
       const opts = (list, cur) => list.map(([v, t]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("");
       $app.innerHTML = `
         <section class="fade-in stack" style="max-width:820px;margin:0 auto">
@@ -841,7 +850,7 @@
             <article class="card stack">
               <div>
                 <p class="muted small" style="margin:0">Sual ${i + 1} · №${it.n} · cavabsız</p>
-                <h3 style="margin:2px 0 0">${esc(q.q)}</h3>
+                <div class="qh3">${qh(q.q)}</div>
               </div>
               ${q.kind === "speaking" ? sampleBlock(q).replace("<details ", "<details open ") : `<details open><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
             </article>`;
@@ -850,7 +859,7 @@
               <div class="row" style="justify-content:space-between;align-items:flex-start">
                 <div style="flex:1;min-width:220px">
                   <p class="muted small" style="margin:0">Sual ${i + 1} · №${it.n}</p>
-                  <h3 style="margin:2px 0 0">${esc(q.q)}</h3>
+                  <div class="qh3">${qh(q.q)}</div>
                 </div>
                 <span class="pill" style="color:${scoreColor(it.score)}" title="Keyfiyyət: ${it.score}/10">${one(pts(it.score) / n)} / ${one(maxOf() / n)}</span>
               </div>
@@ -892,7 +901,7 @@
           <details class="bank-item">
             <summary>
               <span class="qn" style="font-family:var(--serif);font-weight:700;color:var(--accent)">${q.n}.</span>
-              <span>${esc(q.q)}</span>
+              <span>${qh(q.q)}</span>
               <span class="row" style="gap:6px;flex-wrap:nowrap">
                 ${last[q.n] != null ? `<span class="pill small" style="color:${scoreColor(last[q.n])}">${last[q.n]}</span>` : ""}
                 ${q.kind === "speaking" ? `<span class="tag">speaking</span>` : `<span class="tag">${SRC[q.src]}</span>`}
@@ -1017,7 +1026,7 @@
           ${exam.qs.map((n, i) => `
             <li class="${!all && i === active ? "active" : ""} ${!all && i < active ? "done" : ""}">
               <span class="qn">${i + 1}.</span>
-              <span class="qtext">${esc(qOf(n).q)}</span>
+              <span class="qtext">${qh(qOf(n).q)}</span>
             </li>`).join("")}
         </ol>
       </div>`;

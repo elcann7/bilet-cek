@@ -260,3 +260,9 @@ summary { cursor: pointer; color: var(--ink-2); font-size: 14px; font-weight: 50
 .qedit { border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px; background: var(--paper); }
 .qedit + .qedit { margin-top: 10px; }
 .qedit textarea { width: 100%; margin-top: 6px; }
+
+/* kod blokları (Python fənni) və sual başlığı */
+.qh3 { font-family: var(--serif); font-weight: 600; font-size: 18px; line-height: 1.35; margin: 2px 0 0; }
+pre.code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; line-height: 1.5; background: var(--paper, #f6f3ec); border: 1px solid var(--rule, #ddd6c8); border-radius: 6px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; white-space: pre; font-weight: 400; }
+code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .92em; background: var(--paper, #f6f3ec); border-radius: 4px; padding: 1px 4px; }
+pre.code code { background: none; padding: 0; }

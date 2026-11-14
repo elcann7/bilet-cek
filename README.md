@@ -2,7 +2,7 @@
 
 # Bilet Çək
 
-**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 20 ballıq kollokvium balı al.**
+**Universitet kollokvium və imtahanlarına hazırlıq: fənni seç, bilet çək, cavab ver, süni intellektdən 10 ballıq kollokvium balı al.**
 
 [![Canlı sayt](https://img.shields.io/badge/canlı-bilet--cek.vercel.app-7a2a2a?style=flat-square)](https://bilet-cek.vercel.app)
 [![Gemini](https://img.shields.io/badge/AI-Gemini-4a4f57?style=flat-square)](https://aistudio.google.com)
@@ -13,7 +13,7 @@
 
 ---
 
-Əvvəl yalnız ADİAK kollokviumu üçün idi (`adiak-bilet`), indi bütün fənlər üçün ümumidir. Fənni seçirsən, real biletdəki kimi suallar düşür, cavabını **səslə və ya yazılı** verirsən, sonra süni intellekt cavabı etalonla müqayisə edib qiymət verir.
+Bütün universitet fənləri üçün ümumi kollokvium və imtahan simulyatoru. **Hər kəs öz fənnini əlavə edə bilər:** sual PDF-ni, Word faylını və ya mətnini yüklə, sistem ondan sualları çıxarıb sənin üçün ayrıca sınaq yaradır (aşağıda "Öz sınağını yarat"). Fayl serverə göndərilmir, yalnız sənin brauzerində qalır. Fənni seçirsən, real biletdəki kimi suallar düşür, cavabını **səslə və ya yazılı** verirsən, sonra süni intellekt cavabı etalonla müqayisə edib qiymət verir.
 
 ## Fənlər
 
@@ -22,6 +22,8 @@
 | **ADİAK** | 30 nəzəri sual (hər onluqdan 1) | səslə (yazılı da olar) | etalon cavabla müqayisə |
 | **Fizika** | 19 nəzəri sual + 10 məsələ | yazılı (səslə də olar) | nəzəriyyədə etalonla, məsələdə düzgün həll və cavabla |
 | **XDİAK** (ingilis dili) | 25 speaking mövzusu | səslə (yazılı da olar) | qrupun **səviyyəsinə** görə: Elementary-dən Upper-Intermediate-ə; leksik və qrammatik səhvlər sayılır, səviyyədən yuxarı söz tələb olunmur |
+| **Proqramlaşdırma** (Python) | 20 nəzəri mövzu + 10 kod izləmə tapşırığı | yazılı | nəzəriyyədə etalonla, tapşırıqda çıxışın düzgünlüyü ilə |
+| **Riyazi analiz** | 10 nəzəri sual + 20 çalışma | yazılı | nəzəriyyədə etalonla, çalışmada həll və cavabla |
 
 Yeni hazır fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
 
@@ -42,7 +44,7 @@ Etalon cavab məcburi deyil: olmasa, süni intellekt öz fənn biliyinə görə 
 - **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı, hər suala vaxt limiti.
 - **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı mətnə çevirir, həm qiymətləndirir. Brauzerin nitq tanıması işlədilmir (iPhone Safari Azərbaycan dilini tanımır).
 - **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
-- **Kollokvium 20 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamanın 20-yə çevrilməsidir. Fənn üzrə dəyişmək üçün `max` sahəsi var.
+- **Kollokvium 10 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamanın 10-a çevrilməsidir. Fənn üzrə dəyişmək üçün `max` sahəsi var.
 - **Ətraflı rəy:** düzgün fikirlər, çatışmayanlar (ingilis dilində: səhvlər və düzəlişlər), nitq qeydi.
 - **Profillər, tarixçə, zəif suallar:** nəticələr fənnə görə ayrı saxlanır; "zəif suallara üstünlük" rejimi.
 - **Məxfilik:** nəticələr yalnız sənin brauzerindədir. Hər istifadəçi öz pulsuz Gemini açarını işlədir; açar kodda yoxdur.

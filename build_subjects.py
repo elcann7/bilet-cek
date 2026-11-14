@@ -151,7 +151,11 @@ def build_koica():
 
 
 def build_xdiak():
-    d = docx.Document(KOL / "XDİAK kollekvium sualları.docx")
+    src = KOL / "XDİAK kollekvium sualları.docx"
+    if not src.exists():   # mənbə fayl köçürülüb: son qurulmuş nüsxədən götür
+        print("XDİAK mənbə faylı yoxdur, content/xdiak-snapshot.json istifadə olunur")
+        return json.loads((HERE / "content" / "xdiak-snapshot.json").read_text(encoding="utf-8"))
+    d = docx.Document(src)
     ps = [clean(p.text) for p in d.paragraphs if clean(p.text)]
     i = ps.index("Speaking")
     prompts = ps[i + 1:]
@@ -187,9 +191,60 @@ def build_xdiak():
     }
 
 
-SUBJECTS = [build_adiak(), build_fizika(), build_xdiak()]
+# ---------------------------------------------------------------- Python (Proqramlaşdırmanın əsasları)
+def build_python():
+    """Rəsmi sual faylı: 20 nəzəri mövzu + "Misallar" (10 kod izləmə tapşırığı, N hər tələbədə fərqlidir)."""
+    d = docx.Document(KOL / "proqramasdirma esaslari kollek suallari.docx")
+    ps = [clean(p.text) for p in d.paragraphs if clean(p.text)]
+    theory = ps[: ps.index("Misallar.")]
+    assert len(theory) == 20, len(theory)
+    txt = (HERE / "content" / "python-nezeri.txt").read_text(encoding="utf-8")
+    ans = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"(?ms)^### (\d+)\n(.*?)(?=^### |\Z)", txt)}
+    assert sorted(ans) == list(range(1, 21)), sorted(ans)
+    tasks = json.loads((HERE / "content" / "python-meseleler.json").read_text(encoding="utf-8"))
+    assert len(tasks) == 10
+    qs = [{"n": i, "q": t, "kind": "theory", "group": "a" if i <= 10 else "b", "src": "umumi", "answer": ans[i]} for i, t in enumerate(theory, 1)]
+    qs += [{"n": 20 + j, "q": t["q"], "kind": "problem", "group": "p", "src": "hesab", "answer": t["answer"]} for j, t in enumerate(tasks, 1)]
+    return {
+        "id": "python", "short": "Python", "name": "Proqramlaşdırmanın əsasları-1 (Python)",
+        "exam": "Kollokvium", "lang": "az", "answer": "text", "ticket": ["a", "b", "p"],
+        "ticketNote": "Təxmini tərtib: 2 nəzəri sual və 1 kod tapşırığı. Real biletin tərtibini yoxla. Tapşırıqlarda N variantdan variantadır: cavab cədvəli bütün N üçün verilib.",
+        "questions": qs,
+    }
+
+
+# ---------------------------------------------------------------- Riyazi analiz
+def build_riyazi():
+    """Rəsmi suallar (şəkillərdən Gemini oxuyub): 10 nəzəri + 20 çalışma. Etalonlar ümumi biliyə əsasən yazılıb, çalışmalar sympy ilə yoxlanıb."""
+    d = docx.Document(KOL.parent / "Riyazi_analiz_1_kollokvium_suallari.docx") if (KOL.parent / "Riyazi_analiz_1_kollokvium_suallari.docx").exists() else docx.Document(KOL / "riyazi analiz" / "Riyazi_analiz_1_kollokvium_suallari.docx")
+    items = {}
+    for p in d.paragraphs:
+        m = re.match(r"^(\d+)\) (.+)$", clean(p.text))
+        if m:
+            items[int(m.group(1))] = m.group(2)
+    assert sorted(items) == list(range(1, 31)), sorted(items)
+    txt = (HERE / "content" / "riyazi-nezeri.txt").read_text(encoding="utf-8")
+    ans = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"(?ms)^### (\d+)\n(.*?)(?=^### |\Z)", txt)}
+    assert sorted(ans) == list(range(1, 11)), sorted(ans)
+    sol = {r["n"]: r["answer"] for r in json.loads((HERE / "content" / "riyazi-calismalar.json").read_text(encoding="utf-8"))}
+    assert sorted(sol) == list(range(11, 31)), sorted(sol)
+    qs = []
+    for i in range(1, 31):
+        if i <= 10:
+            qs.append({"n": i, "q": items[i], "kind": "theory", "group": "a" if i <= 5 else "b", "src": "umumi", "answer": ans[i]})
+        else:
+            qs.append({"n": i, "q": items[i], "kind": "problem", "group": "p", "src": "hesab", "answer": sol[i]})
+    return {
+        "id": "riyazi", "short": "Riyazi analiz", "name": "Riyazi analiz-1: limit, kəsilməzlik, törəmə",
+        "exam": "Kollokvium", "lang": "az", "answer": "text", "ticket": ["a", "b", "p"],
+        "ticketNote": "Təxmini tərtib: 2 nəzəri sual və 1 çalışma. Real biletin tərtibini yoxla. Suallar şəkillərdən oxunub: düsturları rəsmi siyahı ilə yoxla.",
+        "questions": qs,
+    }
+
+
+SUBJECTS = [build_adiak(), build_fizika(), build_xdiak(), build_python(), build_riyazi()]
 for _s in SUBJECTS:
-    _s.setdefault("max", 20)  # kollokvium cəmi 20 baldır
+    _s.setdefault("max", 10)  # kollokvium cəmi 10 baldır
 (HERE / "subjects.js").write_text("window.SUBJECTS = " + json.dumps(SUBJECTS, ensure_ascii=False, indent=1) + ";\n", encoding="utf-8")
 api = HERE / "api"
 api.mkdir(exist_ok=True)
