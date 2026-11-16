@@ -54,15 +54,21 @@
     const old = store.get("history:" + p.id, null);
     if (old && store.get("history:" + p.id + ":adiak", null) == null) { store.set("history:" + p.id + ":adiak", old); store.del("history:" + p.id); }
   });
-  const DEFAULTS = { key: "", prep: 120, limit: 180, mode: "sections" };
+  // Danışma limiti: 0 = limitsiz (defolt). Əvvəl 3–4 dəqiqə idi, çünki səs tək WAV kimi Vercel-in 4.5 MB
+  // sorğu limitinə sığmalı idi; indi uzun səs hissələrə bölünür (toWavParts), limit yalnız imtahan simulyasiyası üçündür.
+  const LIMITS = [0, 120, 180, 240, 300, 600];
+  const HARD_LIMIT = 1200;   // təhlükəsizlik: unudulmuş yazı 20 dəqiqədə dayanır (telefon yaddaşı)
+  const DEFAULTS = { key: "", prep: 120, limit: 0, mode: "sections" };
   const settings = () => {
-    const s = { ...DEFAULTS, ...store.get("settings", {}) };
-    s.limit = Math.min(s.limit, 240); // server limiti: ən çox 4 dəqiqə
+    const saved = store.get("settings", {});
+    const s = { ...DEFAULTS, ...saved };
+    if (!saved.limitV) s.limit = 0;                         // köhnə saxlanmış 3 dəq. defoltu → limitsiz
+    if (!LIMITS.includes(Number(s.limit))) s.limit = 0;
     return s;
   };
-  // uzun cavab tələb edən fənlərdə (XDİAK) limit fənnin minimumundan az ola bilməz
-  const limitFor = (s) => Math.max(s.limit, (S() && S().limit) || 0);
-  const saveSettings = (s) => store.set("settings", s);
+  // limit seçilibsə, uzun cavab tələb edən fənlərdə (XDİAK) fənnin minimumundan az ola bilməz
+  const limitFor = (s) => (s.limit ? Math.max(s.limit, (S() && S().limit) || 0) : 0);
+  const saveSettings = (s) => store.set("settings", { ...s, limitV: 1 });
 
   // Profillər: eyni cihazda bir neçə nəfər işləsə, nəticələr ada görə ayrı saxlanır
   const profiles = () => store.get("profiles", []);
@@ -105,7 +111,7 @@
       id, custom: true, name, short: cut(x.short, 14).trim() || name.slice(0, 14), exam: cut(x.exam, 30) || "Kollokvium",
       lang: ["az", "en", "ru", "tr"].includes(x.lang) ? x.lang : "az", answer: x.answer === "text" ? "text" : "voice",
       kindDefault: main, per, max: [10, 20, 30, 50, 100].includes(Number(x.max)) ? Number(x.max) : 20,
-      limit: [120, 180, 240].includes(Number(x.limit)) ? Number(x.limit) : 180,
+      limit: LIMITS.includes(Number(x.limit)) ? Number(x.limit) : 0,
       levels: qs.some((q) => q.kind === "speaking") ? lv : [], ticket: Array(per).fill("all"),
       ticketNote: `Biletdə ${per} sual düşür (${qs.length} sualdan, sənin yüklədiyin siyahıdan).`, questions: qs,
     };
@@ -458,7 +464,7 @@
       const ex = editId && SUBJECTS.find((x) => x.id === editId && x.custom);
       const d = ex
         ? { id: ex.id, name: ex.name, short: ex.short, exam: ex.exam, lang: ex.lang, answer: ex.answer, kindDefault: ex.kindDefault, per: ex.per, max: ex.max, limit: ex.limit, questions: ex.questions.map((q) => ({ q: q.q, kind: q.kind, answer: q.answer })) }
-        : { id: "u_" + Math.random().toString(36).slice(2, 9), name: "", short: "", exam: "Kollokvium", lang: "az", answer: "voice", kindDefault: "theory", per: 3, max: 10, limit: 180, questions: [] };
+        : { id: "u_" + Math.random().toString(36).slice(2, 9), name: "", short: "", exam: "Kollokvium", lang: "az", answer: "voice", kindDefault: "theory", per: 3, max: 10, limit: 0, questions: [] };
       const opts = (list, cur) => list.map(([v, t]) => `<option value="${v}" ${String(cur) === String(v) ? "selected" : ""}>${esc(t)}</option>`).join("");
       $app.innerHTML = `
         <section class="fade-in stack" style="max-width:820px;margin:0 auto">
@@ -477,7 +483,7 @@
               <label class="field"><span>Cavab forması</span><select id="c-answer">${opts([["voice", "Səslə (yazılı da olar)"], ["text", "Yazılı (səslə də olar)"]], d.answer)}</select></label>
               <label class="field"><span>Biletdə neçə sual</span><select id="c-per">${opts([1, 2, 3, 4, 5, 6, 8, 10].map((n) => [n, n]), d.per)}</select></label>
               <label class="field"><span>Maksimum bal</span><select id="c-max">${opts([10, 20, 30, 50, 100].map((n) => [n, n]), d.max)}</select></label>
-              <label class="field"><span>Danışma limiti (suala)</span><select id="c-limit">${opts([[120, "2 dəqiqə"], [180, "3 dəqiqə"], [240, "4 dəqiqə"]], d.limit)}</select></label>
+              <label class="field"><span>Danışma limiti (suala)</span><select id="c-limit">${opts([[0, "Limitsiz"], [120, "2 dəqiqə"], [180, "3 dəqiqə"], [240, "4 dəqiqə"], [300, "5 dəqiqə"], [600, "10 dəqiqə"]], d.limit)}</select></label>
             </div>
           </div>
           <div class="card stack">
@@ -610,7 +616,7 @@
             <ol class="steps">
               <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
-              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (ən çox ${mmss(limitFor(s))}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
+              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (${limitFor(s) ? `ən çox ${mmss(limitFor(s))}` : "vaxt limiti yoxdur"}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
               <li>${sub.questions.some((q) => q.kind === "speaking") ? `Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir.` : `Süni intellekt cavabını etalonla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir.`}</li>
             </ol>
             ${sub.sets ? `
@@ -783,7 +789,7 @@
             <button class="mic" id="mic" aria-label="Danışmağa başla">${MIC_SVG}</button>
             <div style="width:100%">
               <p id="rec-label" style="margin:0 0 4px;font-weight:500">Danışmağa başla</p>
-              <p class="muted small" id="rec-sub" style="margin:0 0 10px">Düyməyə bas və suala şifahi cavab ver. Limit: ${mmss(limitFor(s))}.</p>
+              <p class="muted small" id="rec-sub" style="margin:0 0 10px">Düyməyə bas və suala şifahi cavab ver. ${limitFor(s) ? `Limit: ${mmss(limitFor(s))}.` : "Vaxt limiti yoxdur: bitirəndə düyməyə yenidən bas."}</p>
               <div class="meter" id="meter">${"<i></i>".repeat(32)}</div>
             </div>
           </div>`;
@@ -984,7 +990,8 @@
             <select id="prep">${[[0, "Yoxdur"], [60, "1 dəqiqə"], [120, "2 dəqiqə"], [300, "5 dəqiqə"], [600, "10 dəqiqə"]].map(([v, t]) => `<option value="${v}" ${s.prep == v ? "selected" : ""}>${t}</option>`).join("")}</select>
           </label>
           <label class="field"><span>Hər suala danışma limiti</span>
-            <select id="limit">${[[120, "2 dəqiqə"], [180, "3 dəqiqə"], [240, "4 dəqiqə"]].map(([v, t]) => `<option value="${v}" ${s.limit == v ? "selected" : ""}>${t}</option>`).join("")}</select>
+            <small style="display:block;margin:-2px 0 6px">Limitsiz istənilən qədər danışırsan. Real imtahanı simulyasiya etmək istəsən, vaxt seç: vaxt bitəndə yazı dayanır.</small>
+            <select id="limit">${[[0, "Limitsiz"], [120, "2 dəqiqə"], [180, "3 dəqiqə"], [240, "4 dəqiqə"], [300, "5 dəqiqə"], [600, "10 dəqiqə"]].map(([v, t]) => `<option value="${v}" ${s.limit == v ? "selected" : ""}>${t}</option>`).join("")}</select>
           </label>
           <label class="field"><span>Biletin tərtibi</span>
             <select id="mode">
@@ -1093,9 +1100,10 @@
       an.getByteFrequencyData(buf);
       bars.forEach((b, i) => { b.style.height = `${4 + (buf[i + 2] / 255) * 36}px`; });
       const el = (Date.now() - t0) / 1000;
-      ui.label.innerHTML = `<span class="dot"></span>Yazılır · ${mmss(el)} / ${mmss(limitSec)}`;
-      ui.sub.textContent = el > limitSec - 15 ? "Vaxt bitmək üzrədir, fikrini yekunlaşdır." : "Bitirəndə düyməyə yenidən bas.";
-      if (el >= limitSec) { stop(); return; }
+      const cap = limitSec || HARD_LIMIT;
+      ui.label.innerHTML = `<span class="dot"></span>Yazılır · ${mmss(el)}${limitSec ? ` / ${mmss(limitSec)}` : ""}`;
+      ui.sub.textContent = el > cap - 15 ? "Vaxt bitmək üzrədir, fikrini yekunlaşdır." : "Bitirəndə düyməyə yenidən bas.";
+      if (el >= cap) { stop(); return; }
       raf = requestAnimationFrame(tick);
     };
 
@@ -1119,26 +1127,52 @@
     return { stop, done };
   }
 
-  // Mono WAV-a çevir. Tezlik elə seçilir ki, fayl Vercel-in 4.5 MB limitinə sığsın:
-  // qısa cavablar 16 kHz, 4 dəqiqəlik cavab ~8.7 kHz (nitq üçün kifayətdir).
+  // Səs Gemini-yə 16 kHz mono WAV kimi gedir. Vercel funksiyasına bir sorğu ən çox 4.5 MB ola bilər (~2:10 dəqiqə WAV):
+  // daha uzun cavab sakit anlardan (pauzalardan) ~2 dəqiqəlik hissələrə bölünür, hər hissə ayrıca mətnə çevrilir.
   const MAX_WAV = 4_200_000;
-  async function toWav(blob) {
+  const RATE = 16000;
+  const ONE_PART = Math.floor((MAX_WAV - 44) / 2);          // bir sorğuya sığan nümunə sayı
+  async function decode16k(blob) {
+    const buf = await blob.arrayBuffer();
     const AC = window.AudioContext || window.webkitAudioContext;
-    const ac = new AC();
-    const decoded = await ac.decodeAudioData(await blob.arrayBuffer());
+    let ac;
+    try { ac = new AC({ sampleRate: RATE }); } catch { ac = new AC(); }   // birbaşa 16 kHz: uzun yazıda yaddaşa qənaət
+    const decoded = await ac.decodeAudioData(buf);
     ac.close().catch(() => {});
-    const rate = Math.max(8000, Math.min(16000, Math.floor((MAX_WAV - 44) / 2 / decoded.duration)));
-    const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * rate), rate);
+    if (decoded.sampleRate === RATE && decoded.numberOfChannels === 1) return decoded.getChannelData(0);
+    const off = new OfflineAudioContext(1, Math.ceil(decoded.duration * RATE), RATE);
     const src = off.createBufferSource(); src.buffer = decoded; src.connect(off.destination); src.start();
-    const pcm = (await off.startRendering()).getChannelData(0);
+    return (await off.startRendering()).getChannelData(0);
+  }
+  function wavOf(pcm) {
     const view = new DataView(new ArrayBuffer(44 + pcm.length * 2));
-    const w = (o, s) => [...s].forEach((c, i) => view.setUint8(o + i, c.charCodeAt(0)));
+    const w = (o, t) => [...t].forEach((c, k) => view.setUint8(o + k, c.charCodeAt(0)));
     w(0, "RIFF"); view.setUint32(4, 36 + pcm.length * 2, true); w(8, "WAVE"); w(12, "fmt ");
     view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
-    view.setUint32(24, rate, true); view.setUint32(28, rate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    view.setUint32(24, RATE, true); view.setUint32(28, RATE * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
     w(36, "data"); view.setUint32(40, pcm.length * 2, true);
-    for (let i = 0; i < pcm.length; i++) view.setInt16(44 + i * 2, Math.max(-1, Math.min(1, pcm[i])) * 0x7fff, true);
+    for (let k = 0; k < pcm.length; k++) view.setInt16(44 + k * 2, Math.max(-1, Math.min(1, pcm[k])) * 0x7fff, true);
     return new Blob([view], { type: "audio/wav" });
+  }
+  async function toWavParts(blob) {
+    const pcm = await decode16k(blob);
+    if (pcm.length <= ONE_PART) return [wavOf(pcm)];
+    const target = 120 * RATE, look = 4 * RATE, frame = RATE / 20;   // hədəf 2 dəq; son 4 saniyədə ən sakit 50 ms axtarılır
+    const parts = [];
+    let start = 0;
+    while (pcm.length - start > ONE_PART) {
+      const end = start + target;
+      let cut = end, quiet = Infinity;
+      for (let f = end - look; f + frame <= end; f += frame) {
+        let e = 0;
+        for (let k = f; k < f + frame; k++) e += pcm[k] * pcm[k];
+        if (e < quiet) { quiet = e; cut = f + frame / 2; }
+      }
+      parts.push(wavOf(pcm.subarray(start, cut)));
+      start = cut;
+    }
+    parts.push(wavOf(pcm.subarray(start)));
+    return parts;
   }
 
   // ---------- server (Vercel funksiyası /api/grade) ----------
@@ -1168,8 +1202,19 @@
     if (answer && answer.kind === "skip") return { skipped: true, transcript: "", score: 0, covered: [], missed: [], feedback: "", speech: "" };
     if (!answer) return { transcript: "", score: 0, covered: [], missed: ["Cavab verilmədi"], feedback: "Bu suala cavab verilmədi.", speech: "" };
     if (answer.kind === "audio") {
-      if (!answer.wav) answer.wav = await toWav(answer.blob); // təkrar cəhddə yenidən çevirmə
-      return api(`s=${subjectId}&n=${q.n}&kind=audio${lvQ()}`, answer.wav, "audio/wav", s, apiExtra(q));
+      if (!answer.wavs) answer.wavs = await toWavParts(answer.blob);   // təkrar cəhddə yenidən çevirmə
+      if (answer.wavs.length === 1) return api(`s=${subjectId}&n=${q.n}&kind=audio${lvQ()}`, answer.wavs[0], "audio/wav", s, apiExtra(q));
+      // uzun cavab: hissələr ikişər-ikişər mətnə çevrilir (pulsuz limitə görə), sonra bütöv mətn şifahi cavab kimi qiymətləndirilir
+      const of = answer.wavs.length;
+      answer.texts = answer.texts || [];
+      for (let k = 0; k < of; k += 2) {
+        await Promise.all([k, k + 1].filter((x) => x < of && answer.texts[x] == null).map(async (x) => {
+          answer.texts[x] = (await api(`s=${subjectId}&n=${q.n}&kind=transcribe&part=${x + 1}&of=${of}`, answer.wavs[x], "audio/wav", s, apiExtra(q))).transcript || "";
+        }));
+      }
+      const text = answer.texts.join(" ").replace(/\s+/g, " ").trim();
+      if (!text) return { transcript: "", score: 0, covered: [], missed: ["Səs yazısında nitq tanınmadı"], feedback: "Səs yazısında danışıq eşidilmədi. Mikrofonu yoxla və yenidən cəhd et.", speech: "" };
+      return api(`s=${subjectId}&n=${q.n}&kind=text&spoken=1${lvQ()}`, text, "text/plain; charset=utf-8", s, apiExtra(q));
     }
     return api(`s=${subjectId}&n=${q.n}&kind=text${lvQ()}`, answer.text, "text/plain; charset=utf-8", s, apiExtra(q));
   }

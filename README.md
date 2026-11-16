@@ -67,7 +67,8 @@ Etalon cavab məcburi deyil: olmasa, süni intellekt öz fənn biliyinə görə 
 
 ## Xüsusiyyətlər
 
-- **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı, hər suala vaxt limiti.
+- **Real imtahan hissi:** bilet çəkmə, hazırlıq vaxtı; danışma limiti istəyə bağlıdır (defolt limitsiz).
+- **Uzun cavablar:** Vercel-də bir sorğu ən çox 4.5 MB-dır (~2 dəq WAV). Daha uzun səs brauzerdə pauzalardan ~2 dəqiqəlik hissələrə bölünür, hər hissə ayrıca mətnə çevrilir, sonra bütöv mətn şifahi cavab kimi qiymətləndirilir. Səs həmişə 16 kHz qalır.
 - **Səs → mətn → qiymət bir addımda:** Gemini həm danışığı mətnə çevirir, həm qiymətləndirir. Brauzerin nitq tanıması işlədilmir (iPhone Safari Azərbaycan dilini tanımır).
 - **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ və ya kod tapşırığı (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
 - **Kollokvium 10 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamadır. Fənn üzrə dəyişmək üçün `max` sahəsi var.

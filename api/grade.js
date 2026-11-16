@@ -38,7 +38,7 @@ const SRC_LABEL = {
 };
 const LANG_NAME = { az: "Azərbaycan", en: "ingilis", ru: "rus", tr: "türk" };
 
-const OUT_RULES = (kind) => `transcript: ${kind === "audio" ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : "Tələbənin mətnini olduğu kimi qaytar."}`;
+const OUT_RULES = (kind) => `transcript: ${kind === "audio" ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : kind === "spoken" ? "Aşağıdakı mətn tələbənin ŞİFAHİ cavabının avtomatik, sözbəsöz yazısıdır (uzun səs yazısı hissə-hissə mətnə çevrilib). Onu olduğu kimi qaytar." : "Tələbənin mətnini olduğu kimi qaytar."}`;
 
 // Sual növünə görə prompt: nəzəri sual, məsələ, ingilis dilində speaking
 // Qrupun müəllimi qrammatika mövzularını verirsə, şifahi cavabda məhz onlar yoxlanır
@@ -47,9 +47,9 @@ TEACHER'S GRAMMAR TOPICS FOR THIS GROUP: ${g.join("; ")}.
 These are the structures the teacher teaches and checks in speaking. When you look for grammar mistakes, give these topics the highest priority (tense forms of simple tenses and present continuous, articles, countable/uncountable nouns and quantifiers, prepositions, word order, adverbs/adjectives, pronouns, question words, conjunctions and time clauses, have got / has got). Name the topic in the correction, e.g. "[qrammatika: articles] dedin: ... → düzgünü: ...". Mistakes outside these topics still count, but less.` : "");
 
 const PROMPT = (subj, q, kind, level, grammar) => {
-  const how = kind === "audio" ? "şifahi" : "yazılı";
+  const how = kind === "text" ? "yazılı" : "şifahi";   // "spoken" = uzun səs yazısının mətni
   if (q.kind === "speaking") {
-    return `You are an English teacher examining a university student in a speaking colloquium (course: "${subj.name}"). The student answered the speaking task ${kind === "audio" ? "orally" : "in writing"}.
+    return `You are an English teacher examining a university student in a speaking colloquium (course: "${subj.name}"). The student answered the speaking task ${kind === "text" ? "in writing" : "orally"}.
 
 STUDENT'S COURSE LEVEL: ${level ? `${level.label}. Expectations at this level: ${level.desc}` : "about A2–B1"}
 Different student groups study at different levels and their teachers expect different things, so grade RELATIVE TO THIS LEVEL: a 10 means "excellent for this level", not "native-like". Never ask for or penalise the absence of vocabulary or structures above this level. Do count every lexical and grammatical mistake that is visible in the transcript, because the transcript must be literal (see below): wrong tense, missing or wrong articles, subject–verb agreement, word order, plurals, prepositions, wrong word choice or collocation, Azerbaijani-English literal translations. Mistakes in structures the level should already control weigh more; mistakes in structures clearly beyond the level weigh less.${GRAMMAR(grammar)}
@@ -57,7 +57,7 @@ Different student groups study at different levels and their teachers expect dif
 TASK ${q.n}: ${q.q}
 
 Do this:
-1. transcript: ${kind === "audio" ? "Transcribe the audio LITERALLY, word for word, in English, keeping the student's grammar and word-choice mistakes exactly as spoken (do not correct, smooth or complete anything; if a word was mispronounced so that it sounds like another word, write what was said and add [unclear] if unsure). If the recording is empty or unintelligible, say so." : "Return the student's text as it is, with all its mistakes."}
+1. transcript: ${kind === "audio" ? "Transcribe the audio LITERALLY, word for word, in English, keeping the student's grammar and word-choice mistakes exactly as spoken (do not correct, smooth or complete anything; if a word was mispronounced so that it sounds like another word, write what was said and add [unclear] if unsure). If the recording is empty or unintelligible, say so." : kind === "spoken" ? "The student SPOKE the answer; below is an automatic literal transcript of the long recording (made in parts). Return it as it is, with all its mistakes. Judge fluency only from what the transcript shows (fillers, repetitions, unfinished sentences); do not comment on pronunciation." : "Return the student's text as it is, with all its mistakes."}
 2. Judge the answer on: task fulfilment (did they answer the question and develop it at a reasonable length for the level), grammar accuracy, vocabulary range and accuracy, coherence, and fluency, all relative to the level above. Do NOT reward length alone; a long answer full of errors or off-topic is not a good one. In this colloquium the student gets ONE speaking task and is expected to give a long, developed answer (about 2–4 minutes of speech, i.e. a full paragraph or more: explanation, reasons, examples). An answer that is much too short for this (for example only 4–6 simple sentences, under about 100 words) must lose points under task fulfilment and development, even if it is correct. What counts as long enough depends on the level: roughly 200+ words (about 15 simple sentences) for elementary (the teacher's own model texts for this group are 250–330 words), 230+ for pre-intermediate, 270+ for intermediate, 320+ for upper-intermediate. Answers clearly below that lose points; well-developed answers at or above it do not lose points for length.
 3. score (0–10): 9–10 = answers fully, well organised, few minor errors; 7–8 = answers clearly, some errors that do not block meaning; 5–6 = understandable but simple or with frequent errors; 3–4 = very limited, hard to follow; 1–2 = a few words/phrases; 0 = no answer or off-topic.
 4. covered: what the student did well (short phrases, in Azerbaijani). missed: the mistakes found in the transcript, at most 8, most important first, each in the form: "[qrammatika] dedin: ... → düzgünü: ..." or "[leksika] dedin: ... → düzgünü: ..." (quote the student's exact words, give the correct English, add a very short explanation in Azerbaijani when needed). If there are no real mistakes, return an empty list.
@@ -90,7 +90,7 @@ Tapşırıq:
 3. score (0–10): 9–10 = ${problem ? "düzgün həll və düzgün cavab" : "əsas fikirlərin demək olar hamısı, məntiqi ardıcıllıq və terminlərlə"}; 7–8 = ${problem ? "yol düzdür, kiçik hesab və ya vahid səhvi" : "əsas fikirlər var, bir-iki boşluq"}; 5–6 = ${problem ? "yolun yarısı düzdür" : "mövzunun yarısı, səthi"}; 3–4 = ${problem ? "düstur var, həll yarımçıq" : "bir neçə doğru fikir"}; 1–2 = çox az və ya ümumi sözlər; 0 = cavab yoxdur və ya mövzudan kənardır. Ədalətli ol, amma uzun danışmağı məzmun kimi qiymətləndirmə.
 4. covered: tələbənin düzgün dediyi əsas fikirlər${problem ? " və ya düzgün addımlar" : ""} (hər biri qısa ifadə). missed: ${problem ? "səhv və ya buraxılmış addımlar" : "etalonda olub deyilməyən ən vacib fikirlər"} (ən çox 5, qısa).
 5. feedback: tələbəyə "sən" deyə müraciət edən 2–3 cümləlik konkret rəy: nə yaxşı idi, balı artırmaq üçün nə əlavə etməli idi.
-6. speech: ${kind === "audio" ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
+6. speech: ${kind !== "text" ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
 7. why: TƏK cümlə: niyə məhz bu bal və niyə daha yüksək deyil (hansı hissə tam idi, hansı yarımçıq və ya səhv). Məs.: "Tərifi və iki növü düz dedin, amma üçüncü növü və nümunəni buraxdın, buna görə 6."
 8. wrong: tələbənin ${problem ? "həllində" : "cavabında"} SƏHV dediyi konkret fikirlər${problem ? ", düsturlar və ya hesablamalar" : ""}, hər biri "dedin: … → düzgünü: …" formasında (tələbənin sözlərini qısa sitat gətir). "missed"-dən fərqlidir: missed = deyilməyənlər, wrong = səhv deyilənlər. Səhv yoxdursa, boş siyahı.
 9. better: "Sənin cavabın necə olsaydı 10 bal alardı". ${problem
@@ -269,7 +269,21 @@ export async function POST(request) {
   let subj, q;
   if (sid.startsWith("u_")) { const c = fromCtx(request); if (c) { subj = c.subj; q = c.q; } }   // istifadəçinin öz fənni: sual başlıqla gəlir
   else { subj = DATA[sid]; q = subj && subj.q[n]; }
-  if (!q || !["audio", "text", "sample"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
+  if (!q || !["audio", "text", "sample", "transcribe"].includes(kind)) return json(400, { error: "Yanlış sorğu" });
+
+  // Uzun cavab: brauzer səsi ~2 dəqiqəlik hissələrə bölür (Vercel sorğusu ən çox 4.5 MB), hər hissə ayrıca mətnə çevrilir
+  if (kind === "transcribe") {
+    const raw = Buffer.from(await request.arrayBuffer());
+    if (!raw.length || raw.length > MAX_BYTES) return json(413, { error: "Səs hissəsi boşdur və ya çox böyükdür" });
+    if (raw.subarray(0, 4).toString("ascii") !== "RIFF") return json(400, { error: "Səs WAV formatında deyil" });
+    const part = Number(url.searchParams.get("part")) || 1, of = Number(url.searchParams.get("of")) || 1;
+    const lang = q.kind === "speaking" ? "English" : (LANG_NAME[subj.lang] ? `${LANG_NAME[subj.lang]} dili` : "Azərbaycan dili");
+    const prompt = `Bu, universitet tələbəsinin "${subj.name}" fənnindən şifahi cavabının səs yazısının ${part}-ci hissəsidir (cəmi ${of} hissə). Sual: ${q.q}
+
+Səsi ${lang} ilə SÖZBƏSÖZ mətnə çevir: tələbənin dediyini olduğu kimi yaz, qrammatik və leksik səhvləri DÜZƏLTMƏ, heç nə əlavə etmə və tamamlama, parazit sözləri (yəni, şey, ee, um) saxla. Anlaşılmayan söz üçün [anlaşılmır] yaz. Hissə cümlənin ortasında başlaya və ya bitə bilər: onu olduğu kimi saxla. Səs boşdursa, boş mətn qaytar.`;
+    const r = await callGemini(key, [{ text: prompt }, { inline_data: { mime_type: "audio/wav", data: raw.toString("base64") } }], { type: "object", properties: { transcript: { type: "string" } }, required: ["transcript"] }, 0);
+    return r.ok ? json(200, { transcript: String(r.ok.transcript || "").trim() }) : json(r.status, { error: r.error });
+  }
 
   if (kind === "sample") {
     if (q.kind !== "speaking") return json(400, { error: "Nümunə cavab yalnız speaking üçündür" });
@@ -296,7 +310,8 @@ IMPORTANT: your previous attempt had only ${short} words, which is far too short
   const lvId = url.searchParams.get("lv");
   const level = (subj.levels || []).find((l) => l.id === lvId) || (subj.levels || [])[0];
   const grammar = ((subj.sets || []).find((x) => x.id === url.searchParams.get("st")) || {}).grammar;
-  const parts = [{ text: PROMPT(subj, q, kind, level, grammar) }];
+  const spoken = kind === "text" && url.searchParams.get("spoken") === "1";
+  const parts = [{ text: PROMPT(subj, q, spoken ? "spoken" : kind, level, grammar) }];
   if (kind === "audio") {
     if (body.subarray(0, 4).toString("ascii") !== "RIFF") return json(400, { error: "Səs WAV formatında deyil" });
     parts.push({ inline_data: { mime_type: "audio/wav", data: body.toString("base64") } });
