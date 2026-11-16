@@ -48,16 +48,14 @@ p { margin: 0 0 .8em; }
   width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
   border: 1.5px solid var(--accent); color: var(--accent); font-family: var(--serif); font-weight: 700;
 }
+.top-right, .ctx { display: flex; align-items: center; gap: 4px; min-width: 0; }
 nav { display: flex; gap: 4px; }
+.tabs svg { display: none; }
+.m-only { display: none; }
 .link { background: none; border: 0; padding: 6px 10px; border-radius: 6px; color: var(--ink-2); font-size: 14px; }
 .link:hover { background: var(--sheet); color: var(--ink); }
+.tabs .link[aria-current="page"] { color: var(--ink); background: var(--sheet); }
 .link.who { color: var(--accent); font-weight: 500; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 560px) {
-  .brand span:last-child { display: none; }
-  nav { gap: 0; }
-  .link { padding: 6px 7px; }
-  .link.who { max-width: 110px; }
-}
 
 main { max-width: 960px; margin: 0 auto; padding: 28px 16px 80px; }
 
@@ -103,7 +101,6 @@ main { max-width: 960px; margin: 0 auto; padding: 28px 16px 80px; }
   display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; margin: 26px 0;
   perspective: 1200px;
 }
-@media (max-width: 560px) { .deck { grid-template-columns: repeat(3, 1fr); } }
 .ticket {
   aspect-ratio: 3 / 4; border: 0; padding: 0; background: none; position: relative;
   transition: transform .25s ease, opacity .4s ease;
@@ -128,7 +125,7 @@ main { max-width: 960px; margin: 0 auto; padding: 28px 16px 80px; }
 .ticket .back i { font-style: normal; font-family: var(--serif); color: var(--accent); font-size: 13px; letter-spacing: .12em; }
 .ticket .front { background: var(--accent); color: var(--sheet); transform: rotateY(180deg); font-family: var(--serif); }
 .ticket .front b { font-size: 34px; display: block; }
-.ticket:hover:not(.picked) { transform: translateY(-6px) rotate(-1deg); }
+@media (hover: hover) { .ticket:hover:not(.picked) { transform: translateY(-6px) rotate(-1deg); } }
 .ticket.picked { transform: scale(1.05); z-index: 2; }
 .ticket.picked .inner { transform: rotateY(180deg); }
 .deck.done .ticket:not(.picked) { opacity: .25; pointer-events: none; }
@@ -143,6 +140,7 @@ main { max-width: 960px; margin: 0 auto; padding: 28px 16px 80px; }
 .paper-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 10px; margin-bottom: 18px; }
 .paper-head .no { font-family: var(--serif); font-size: 22px; font-weight: 700; }
 .qlist { list-style: none; padding: 0; margin: 0; }
+.qlist li > *, .bank-item summary > *, .cols > * { min-width: 0; }
 .qlist li { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--rule); }
 .qlist li:last-child { border-bottom: 0; }
 .qlist .qn { font-family: var(--serif); font-weight: 700; color: var(--accent); }
@@ -235,7 +233,7 @@ summary { cursor: pointer; color: var(--ink-2); font-size: 14px; font-weight: 50
 /* ---------- fənn seçimi ---------- */
 .subjects { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 .subject { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 18px; transition: border-color .15s, transform .15s; }
-.subject:hover { border-color: var(--accent); transform: translateY(-2px); }
+@media (hover: hover) { .subject:hover { border-color: var(--accent); transform: translateY(-2px); } }
 .subject-tag { font-family: var(--serif); font-weight: 700; font-size: 22px; color: var(--accent); letter-spacing: .01em; }
 .subject-name { font-family: var(--serif); font-weight: 600; font-size: 16px; line-height: 1.3; }
 .subject-foot { margin-top: auto; padding-top: 10px; color: var(--ink-3); }
@@ -266,3 +264,94 @@ summary { cursor: pointer; color: var(--ink-2); font-size: 14px; font-weight: 50
 pre.code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 14px; line-height: 1.5; background: var(--paper, #f6f3ec); border: 1px solid var(--rule, #ddd6c8); border-radius: 6px; padding: 10px 12px; margin: 8px 0; overflow-x: auto; white-space: pre; font-weight: 400; }
 code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: .92em; background: var(--paper, #f6f3ec); border-radius: 4px; padding: 1px 4px; }
 pre.code code { background: none; padding: 0; }
+
+/* ---------- nəticə: izah və "necə olsaydı yaxşı olardı" ---------- */
+.why { margin: 0; font-size: 14px; color: var(--ink-2); }
+.why b { color: var(--ink); font-weight: 600; }
+.wrong h4 { color: var(--red); }
+.wrong ul { margin: 6px 0 0; padding-left: 18px; }
+.wrong li { margin-bottom: 4px; }
+.better { border: 1px solid var(--rule-2); border-left: 3px solid var(--accent); background: #fff; border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px; }
+.better > h4 { font-family: var(--serif); text-transform: none; letter-spacing: 0; font-size: 17px; color: var(--accent); margin: 0 0 2px; }
+.better .legend { font-size: 13px; color: var(--ink-3); margin: 0 0 10px; }
+.better .ref p { font-family: var(--serif); font-size: 16.5px; line-height: 1.65; }
+.better .ref strong { font-weight: 600; background: var(--accent-soft); color: #5e1f1f; border-radius: 3px; padding: 0 2px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.coach { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; background: var(--paper); border-radius: var(--radius); padding: 14px 16px; }
+.coach h4 { color: var(--ink); }
+.coach ol, .coach ul { margin: 6px 0 0; padding-left: 20px; font-size: 15px; }
+.coach li { margin-bottom: 4px; }
+.coach > * { min-width: 0; }
+
+/* ---------- telefon ---------- */
+@media (max-width: 640px) {
+  .top { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); gap: 10px; }
+  .brand span:last-child { display: none; }
+  .top-right { flex: 1; justify-content: flex-end; }
+  .ctx { gap: 6px; }
+  .link.who { border: 1px solid var(--rule-2); border-radius: 99px; padding: 7px 12px; font-size: 13px; max-width: 42vw; background: var(--sheet); }
+  .link.who .pre { display: none; }
+
+  /* naviqasiya aşağıda: baş barmaq zonası */
+  .m-only { display: flex; }
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    background: var(--paper); border-top: 1px solid var(--rule);
+    padding: 4px 6px max(6px, env(safe-area-inset-bottom));
+  }
+  .tabs .link { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; padding: 4px 0; font-size: 11.5px; font-weight: 500; color: var(--ink-3); border-radius: 8px; }
+  .tabs .link:hover { background: none; }
+  .tabs .link[aria-current="page"] { color: var(--accent); background: none; }
+  .tabs svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  /* imtahan zamanı alt menyu gizlənir: təsadüfən çıxmasın */
+  body[data-view="draw"] .tabs, body[data-view="prep"] .tabs, body[data-view="answer"] .tabs, body[data-view="grading"] .tabs, body[data-view="who"] .tabs, body[data-view="key"] .tabs { display: none; }
+
+  main { padding: 18px 16px calc(96px + env(safe-area-inset-bottom)); }
+  body[data-view="draw"] main, body[data-view="prep"] main, body[data-view="answer"] main, body[data-view="grading"] main { padding-bottom: 24px; }
+  h1 { font-size: 28px; }
+  h2 { font-size: 22px; }
+  .card { padding: 16px; }
+  .btn { min-height: 48px; }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom)); }
+
+  /* əsas düymələr tam en */
+  .cta { flex-direction: column; align-items: stretch; }
+  .cta > .btn { width: 100%; }
+  .cta > .link { align-self: center; min-height: 44px; }
+
+  .hero { gap: 20px; }
+  .stats { gap: 8px; }
+  .stat { padding: 10px; }
+  .stat b { font-size: 22px; }
+
+  .deck { grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 18px 0; }
+  .ticket .back i { font-size: 10px; letter-spacing: .06em; }
+  .ticket .front b { font-size: 20px; }
+  .ticket .front small { font-size: 11px; }
+
+  .paper { padding: 16px; }
+  .paper-head { flex-wrap: wrap; }
+  .qlist li { grid-template-columns: 26px 1fr; gap: 6px; }
+  .qlist li.active { margin: 0 -8px; padding: 12px 8px; }
+  .clock { font-size: 38px; }
+  .prep-bar { flex-direction: column; align-items: stretch; text-align: center; }
+
+  /* cavab ekranında "növbəti" düyməsi ekranın altına yapışır */
+  .answer-actions { position: sticky; bottom: 0; z-index: 4; margin: 0 -16px; padding: 10px 16px max(12px, env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--rule); }
+
+  .verdict { gap: 14px; }
+  .grade { width: 104px; height: 104px; justify-self: center; }
+  .grade b { font-size: 36px; }
+  .scorebar b { min-width: 48px; font-size: 14px; }
+  .better { padding: 12px 14px; }
+  .better .ref p { font-size: 16px; }
+  .coach { grid-template-columns: 1fr; gap: 12px; }
+
+  .bank-item summary { grid-template-columns: 26px 1fr; }
+  .bank-item summary > :last-child { grid-column: 2; justify-self: start; }
+  .bank-item .ref { padding-left: 0; }
+  .hist { grid-template-columns: auto 1fr; gap: 10px; }
+  .hist .btn { grid-column: 1 / -1; width: 100%; min-height: 42px; }
+  .subjects { grid-template-columns: 1fr; gap: 10px; }
+  .subject { padding: 16px; }
+}

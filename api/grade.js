@@ -18,8 +18,14 @@ const SCHEMA = {
     feedback: { type: "string" },
     speech: { type: "string" },
     corrected: { type: "string" },
+    // izah: niyə bu bal, səhv deyilənlər, "cavabın necə olsaydı 10 olardı", ideal cavabın planı, növbəti addımlar
+    why: { type: "string" },
+    wrong: { type: "array", items: { type: "string" } },
+    better: { type: "string" },
+    plan: { type: "array", items: { type: "string" } },
+    steps: { type: "array", items: { type: "string" } },
   },
-  required: ["transcript", "score", "covered", "missed", "feedback", "speech"],
+  required: ["transcript", "score", "covered", "missed", "feedback", "speech", "why", "wrong", "better", "plan", "steps"],
 };
 
 const SRC_LABEL = {
@@ -58,7 +64,12 @@ Do this:
 5. feedback: 2–3 sentences in Azerbaijani addressed to the student ("sən"): what was good and what to do to raise the score.
 6. speech: 1 sentence in Azerbaijani about fluency and pronunciation (hesitations, filler words, sentence variety).
 7. corrected: rewrite the student's WHOLE answer as it should have been said: same ideas, same order and same structure, in the same spoken style and at the same level (use words and grammar the student could realistically use), but with EVERY grammar and vocabulary mistake fixed and obvious gaps in sentences completed. Do not add new ideas, do not make it fancier than the student's level, do not shorten it. Keep the student's correct sentences unchanged. Plain text, paragraphs separated by a blank line. If the transcript is empty, return an empty string.
-Write covered/missed/feedback/speech in Azerbaijani; keep quoted English and the "corrected" text as English.`;
+8. why: ONE sentence in Azerbaijani explaining exactly why this score and not higher (which criterion cost the points), e.g. "Mövzunu cavablandırdın, amma cavab ~90 sözdür və hər fikrə nümunə yoxdur; artikl səhvləri də bal apardı."
+9. better: the student's OWN answer raised to a 10/10 answer FOR THIS LEVEL. Start from the corrected version: keep the student's ideas, order and voice, fix every mistake, and develop it to the expected length for the level by adding reasons, a concrete personal example for each idea, linking words, a short opening and closing. Use only words and grammar the student's level can realistically produce. Wrap EVERY part you added or changed in **double asterisks** (only within a sentence, never across paragraphs) so the student sees the difference; leave the student's own correct words unmarked. English, plain text, paragraphs separated by a blank line. If the transcript is empty, write a full model answer for the level without any ** marks.
+10. plan: 4–6 short items in Azerbaijani (key English phrases may stay in English) describing the structure of an ideal answer to THIS task, e.g. "Giriş: mövzunu bir cümlə ilə təqdim et (I'd like to talk about…)".
+11. steps: 2–3 concrete, actionable tips in Azerbaijani for the next attempt, based on THIS student's mistakes (not generic advice).
+12. wrong: return an empty list (in speaking, mistakes go to "missed").
+Write covered/missed/feedback/speech/why/plan/steps in Azerbaijani; keep quoted English and the "corrected" and "better" texts as English.`;
   }
   const problem = q.kind === "problem";
   const langNote = subj.lang && subj.lang !== "az" && LANG_NAME[subj.lang] ? ` Tələbə ${LANG_NAME[subj.lang]} dilində cavab verir; səs yazısını həmin dildə mətnə çevir.` : "";
@@ -80,6 +91,13 @@ Tapşırıq:
 4. covered: tələbənin düzgün dediyi əsas fikirlər${problem ? " və ya düzgün addımlar" : ""} (hər biri qısa ifadə). missed: ${problem ? "səhv və ya buraxılmış addımlar" : "etalonda olub deyilməyən ən vacib fikirlər"} (ən çox 5, qısa).
 5. feedback: tələbəyə "sən" deyə müraciət edən 2–3 cümləlik konkret rəy: nə yaxşı idi, balı artırmaq üçün nə əlavə etməli idi.
 6. speech: ${kind === "audio" ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
+7. why: TƏK cümlə: niyə məhz bu bal və niyə daha yüksək deyil (hansı hissə tam idi, hansı yarımçıq və ya səhv). Məs.: "Tərifi və iki növü düz dedin, amma üçüncü növü və nümunəni buraxdın, buna görə 6."
+8. wrong: tələbənin ${problem ? "həllində" : "cavabında"} SƏHV dediyi konkret fikirlər${problem ? ", düsturlar və ya hesablamalar" : ""}, hər biri "dedin: … → düzgünü: …" formasında (tələbənin sözlərini qısa sitat gətir). "missed"-dən fərqlidir: missed = deyilməyənlər, wrong = səhv deyilənlər. Səhv yoxdursa, boş siyahı.
+9. better: "Sənin cavabın necə olsaydı 10 bal alardı". ${problem
+    ? "Tələbənin həllini əsas götürərək TAM həlli addım-addım yaz: verilənlər, düstur və ya alqoritm, əvəzləmə və ya kod, hesablama, son cavab (fiziki kəmiyyətdə ölçü vahidi ilə). Tələbənin düzgün addımlarını öz sözləri ilə saxla; əlavə etdiyin və düzəltdiyin addımları **qoşa ulduz** içində yaz."
+    : "Tələbənin ÖZ cavabını əsas götür: onun düzgün cümlələrini və fikir ardıcıllığını saxla (yalnız danışıq qüsurlarını, təkrarları və parazit sözləri təmizlə), səhv fikirləri düzəlt, çatışmayan vacib fikirləri məntiqi yerinə əlavə et. Əlavə etdiyin və düzəltdiyin HƏR hissəni **qoşa ulduz** içində yaz (yalnız bir cümlə daxilində, abzaslar arası yox) ki, tələbə fərqi görsün; tələbənin öz düzgün sözlərini işarələmə."} Bu, kollokviumda ${how} deyilə biləcək təbii üslubda olsun: ${problem ? "aydın və yığcam" : "giriş cümləsi, əsas hissə (terminlərlə, lazım olsa bir misal), qısa yekun; təxminən 120–220 söz"}. ${q.answer ? "Etalonda olmayan uydurma fakt əlavə etmə." : "Yalnız əmin olduğun faktları yaz."} Kod lazımdırsa, \`\`\` bloku içində yaz. Abzasları boş sətirlə ayır. Tələbə heç nə deməyibsə (transcript boşdur), ** işarəsiz tam nümunə cavab yaz.
+10. plan: ${problem ? "bu məsələnin həll alqoritmi: 3–6 qısa addım (məs. \"Verilənləri SI vahidinə çevir\")" : "ideal cavabın skeleti: 3–6 qısa bənd, yadda saxlamaq üçün (məs. \"Tərif\", \"Üç növü və fərqləri\", \"Gündəlik həyatdan misal\")"}.
+11. steps: bu tələbənin konkret səhvlərinə əsaslanan 2–3 aydın addım: növbəti dəfə balı artırmaq üçün nə etməli (ümumi məsləhət yox).
 Bütün mətnlər Azərbaycan dilində olsun.`;
 };
 

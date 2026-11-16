@@ -27,7 +27,7 @@ Universitetdə kollokvium günü sual siyahısından bilet çəkilir və cavab v
 <td width="25%" align="center"><img src="docs/home.png" alt="Fənn seç"><br><b>1. Fənni seç</b><br><sub>Hazır fənlər və ya öz yaratdığın sınaq.</sub></td>
 <td width="25%" align="center"><img src="docs/draw.png" alt="Bilet çək"><br><b>2. Bilet çək</b><br><sub>Masada 10 bilet var, birini götürürsən.</sub></td>
 <td width="25%" align="center"><img src="docs/question.png" alt="Cavab ver"><br><b>3. Cavab ver</b><br><sub>Hər suala ayrıca, səslə və ya yazılı. Kod tapşırıqları kod bloku ilə göstərilir.</sub></td>
-<td width="25%" align="center"><img src="docs/result.png" alt="Nəticə"><br><b>4. Bal al</b><br><sub>Kollokvium balı 10 üzərindən, hər sual üçün rəy və çatışmayanlar.</sub></td>
+<td width="25%" align="center"><img src="docs/result.png" alt="Nəticə"><br><b>4. Bal al</b><br><sub>Kollokvium balı 10 üzərindən; hər sualda niyə bu bal və cavabının 10 ballıq variantı.</sub></td>
 </tr>
 </table>
 
@@ -71,8 +71,9 @@ Etalon cavab məcburi deyil: olmasa, süni intellekt öz fənn biliyinə görə 
 - **Sual növünə uyğun qiymətləndirmə:** nəzəri sual, məsələ və ya kod tapşırığı (həll yolu və son cavab) və ingilis dilində danışıq (task, qrammatika, lüğət, axıcılıq) üçün ayrı meyarlar.
 - **Kollokvium 10 baldır:** hər sual 0–10 keyfiyyət qiyməti alır (Təhsil Nazirliyinin 1060 saylı əsasnaməsindəki meyarlara uyğun), biletin balı bu ortalamadır. Fənn üzrə dəyişmək üçün `max` sahəsi var.
 - **Ətraflı rəy:** düzgün fikirlər, çatışmayanlar (ingilis dilində: səhvlər və düzəlişlər), nitq qeydi.
+- **"Cavabın necə olsaydı 10 olardı":** hər sualda balın səbəbi (bir cümlə), səhv dediklərin ("dedin → düzgünü"), sənin **öz cavabının** 10 ballıq variantı (əlavə olunan və düzəldilən hissələr vurğulanır), ideal cavabın planı və növbəti dəfə üçün 2–3 konkret addım. Məsələlərdə tam həll addım-addım, ingilis dilində səviyyənə uyğun inkişaf etdirilmiş cavab.
 - **Profillər, tarixçə, zəif suallar:** nəticələr fənnə görə ayrı saxlanır; "zəif suallara üstünlük" rejimi.
-- **Telefon və kompüter:** mobil üçün yazılıb, masaüstündə də rahat işləyir.
+- **Telefon və kompüter:** masaüstündə geniş sayt görünüşü; telefonda alt menyu (imtahan zamanı gizlənir ki, təsadüfən çıxmayasan), tam enli düymələr, cavab ekranında "Növbəti sual" ekranın altına yapışır, iPhone-un çentik/ev zolağı nəzərə alınır.
 
 <details>
 <summary><b>Masaüstü görünüşü</b></summary>

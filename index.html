@@ -18,13 +18,18 @@
     <span class="seal">B</span>
     <span><b>Bilet Çək</b> · Kollokvium simulyatoru</span>
   </button>
-  <nav>
-    <button class="link who" id="subj" hidden></button>
-    <button class="link who" id="who" hidden></button>
-    <button class="link" data-go="bank">Suallar</button>
-    <button class="link" data-go="history">Tarixçə</button>
-    <button class="link" data-go="settings">Ayarlar</button>
-  </nav>
+  <div class="top-right">
+    <div class="ctx">
+      <button class="link who" id="subj" hidden></button>
+      <button class="link who" id="who" hidden></button>
+    </div>
+    <nav class="tabs" aria-label="Bölmələr">
+      <button class="link m-only" data-go="home"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg><span>Bilet</span></button>
+      <button class="link" data-go="bank"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16M4 12h16M4 19h10"/></svg><span>Suallar</span></button>
+      <button class="link" data-go="history"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg><span>Tarixçə</span></button>
+      <button class="link" data-go="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Ayarlar</span></button>
+    </nav>
+  </div>
 </header>
 
 <main id="app"></main>

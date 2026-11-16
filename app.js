@@ -189,6 +189,26 @@
       <div class="sample-body">${sampleHtml(q)}</div>
       <div class="row" style="margin-top:12px"><button class="btn ghost" data-sample="${q.n}">${(samples[sampleKey(q)] || []).length ? "Başqa nümunə yarat" : "Nümunə cavab yarat"}</button></div>
     </details>`;
+  // Nəticədə hər sualın izahı: tələbənin öz cavabı 10 ballıq səviyyəyə qaldırılır, əlavə/düzəlişlər qalın yazılır
+  const betterBlock = (it, q) => {
+    if (!it.better || !String(it.better).trim()) return "";
+    const marked = /\*\*/.test(it.better);
+    const title = it.score >= 9 ? "Cavabın artıq güclüdür: kiçik cilalama ilə belə olardı" : "Cavabın necə olsaydı 10 bal alardı";
+    const legend = q.kind === "problem"
+      ? "Sənin həllin əsasında tam həll. Qalın yazılanlar səndə olmayan və ya düzəldilən addımlardır."
+      : q.kind === "speaking"
+      ? "Sənin cavabın, səviyyənə uyğun inkişaf etdirilmiş. Qalın yazılanlar əlavə olunan və ya düzəldilən hissələrdir."
+      : "Sənin cavabın əsasında. Qalın yazılanlar demədiyin və ya düzəldilən hissələrdir.";
+    return `<div class="better"><h4>${title}</h4>${marked ? `<p class="legend">${legend}</p>` : `<p class="legend">Nümunə cavab: bu sualı belə cavablandırmaq olar.</p>`}<div class="ref">${md(it.better).replace(/\*\*/g, "")}</div></div>`;
+  };
+  const coachBlock = (it, q) => {
+    const plan = it.plan || [], steps = it.steps || [];
+    if (!plan.length && !steps.length) return "";
+    return `<div class="coach">
+      ${plan.length ? `<div><h4>${q.kind === "problem" ? "Həllin alqoritmi" : "İdeal cavabın planı"}</h4><ol>${plan.map((x) => `<li>${inl(esc(String(x).replace(/^\s*\d+[.)]\s*/, "")))}</li>`).join("")}</ol></div>` : ""}
+      ${steps.length ? `<div><h4>Növbəti dəfə</h4><ul>${steps.map((x) => `<li>${inl(esc(x))}</li>`).join("")}</ul></div>` : ""}
+    </div>`;
+  };
   function bindSamples(root) {
     root.querySelectorAll("[data-sample]").forEach((btn) => {
       btn.onclick = async () => {
@@ -232,22 +252,28 @@
     cleanup.forEach((f) => { try { f(); } catch { /* */ } });
     cleanup = [];
     window.scrollTo({ top: 0 });
-    if (!currentProfile() && view !== "who") { VIEWS.who(view); return; }
+    if (!currentProfile() && view !== "who") { document.body.dataset.view = "who"; VIEWS.who(view); return; }
     if (!subjectId && !["who", "key", "subjects", "settings", "create"].includes(view)) view = "subjects";
-    renderTop();
+    document.body.dataset.view = view;                       // telefonda: imtahan zamanı alt menyu gizlənir
+    renderTop(view);
     VIEWS[view](...args);
   }
   const $subj = document.getElementById("subj");
-  function renderTop() {
+  function renderTop(view) {
     const sub = subjectId && S();
     $subj.hidden = !sub;
-    $subj.textContent = sub ? `Fənn: ${sub.short}` : "";
+    $subj.innerHTML = sub ? `<span class="pre">Fənn: </span>${esc(sub.short)}` : "";
+    $subj.title = sub ? "Fənni dəyiş" : "";
+    document.querySelectorAll(".tabs [data-go]").forEach((b) => {
+      if (b.dataset.go === view) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+    });
   }
   const $who = document.getElementById("who");
   function renderWho() {
     const n = profileName();
     $who.hidden = !n;
-    $who.textContent = n ? `${n} · dəyiş` : "";
+    $who.innerHTML = n ? `${esc(n)}<span class="pre"> · dəyiş</span>` : "";
+    $who.title = n ? "Profili dəyiş" : "";
   }
   $subj.addEventListener("click", () => {
     const inExam = exam && !exam.finished && exam.answers.some(Boolean);
@@ -469,7 +495,7 @@
               <div class="row"><button class="btn ghost" id="c-add">+ Sual əlavə et</button><button class="btn ghost" id="c-mkans">Etalon cavabları materialdan yarat</button></div></div>
             <div id="c-list"></div>
           </div>
-          <div class="row"><button class="btn accent" id="c-save">Yadda saxla</button><button class="btn ghost" id="c-cancel">Ləğv et</button></div>
+          <div class="row cta"><button class="btn accent" id="c-save">Yadda saxla</button><button class="btn ghost" id="c-cancel">Ləğv et</button></div>
         </section>`;
       const $ = (id) => $app.querySelector("#" + id);
       const ql = $("c-list"), st = $("c-status"), ta = $("c-src");
@@ -596,7 +622,7 @@
               </label>` : ""}
             ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.grammar && st.grammar.length ? `<details style="margin:0 0 18px"><summary class="small">Qrammatika mövzuları (${st.grammar.length}): cavabında bunlar yoxlanır</summary><ul class="small" style="margin:8px 0 0">${st.grammar.map((g) => `<li>${esc(g)}</li>`).join("")}</ul></details>` : ""; })()}
             ${(() => { const st = sub.sets && sub.sets.find((x) => x.id === curSetId(sub)); return st && st.texts && st.texts.length ? `<details style="margin:0 0 18px"><summary class="small">Müəllimin nümunə mətnləri (${st.texts.length}): necə danışmaq lazımdır</summary><div style="margin-top:8px">${st.texts.map((t) => `<details class="bank-item"><summary><span class="qn" style="font-family:var(--serif);font-weight:700;color:var(--accent)">${t.n}.</span><span>${esc(t.title)}</span><span class="tag">${t.text.split(/\s+/).length} söz</span></summary><div class="ref">${md(t.text)}</div></details>`).join("")}</div></details>` : ""; })()}
-            <div class="row">
+            <div class="row cta">
               <button class="btn accent" id="start">Bilet çək</button>
               <button class="btn ghost" data-v="bank">Bütün suallar</button>
             </div>
@@ -655,7 +681,7 @@
       $app.innerHTML = `
         <section class="fade-in stack">
           ${paper(0, true)}
-          <div class="card row" style="justify-content:space-between">
+          <div class="card row prep-bar" style="justify-content:space-between">
             <div>
               <p class="muted small" style="margin:0">${s.prep ? "Hazırlıq vaxtı" : "Hazırlıq vaxtı söndürülüb"}</p>
               ${s.prep ? `<div class="clock" id="clock">${mmss(s.prep)}</div>` : ""}
@@ -694,7 +720,7 @@
             ${hint ? `<p class="muted small" style="margin:0">${hint}</p>` : ""}
             <div id="rec-body"></div>
           </div>
-          <div class="row" style="justify-content:space-between">
+          <div class="row cta answer-actions" style="justify-content:space-between">
             <button class="link" id="skip" title="Bu suala cavab vermək məcburi deyil">Cavab vermirəm, etalona bax</button>
             <button class="btn" id="next" disabled>${last ? "Bileti təhvil ver" : "Növbəti sual →"}</button>
           </div>
@@ -864,17 +890,23 @@
                 <span class="pill" style="color:${scoreColor(it.score)}" title="Keyfiyyət: ${it.score}/10">${one(pts(it.score) / n)} / ${one(maxOf() / n)}</span>
               </div>
               <p style="margin:0">${esc(it.feedback)}</p>
+              ${it.why ? `<p class="why"><b>Niyə bu bal:</b> ${esc(it.why)}</p>` : ""}
               <div class="cols">
                 <div class="good"><h4>${q.kind === "speaking" ? "Yaxşı olanlar" : "Dediklərin"}</h4><ul>${(it.covered || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
                 <div class="miss"><h4>${q.kind === "speaking" ? "Səhvlər və düzəlişlər" : "Çatışmayanlar"}</h4><ul>${(it.missed || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
               </div>
+              ${(it.wrong || []).length && q.kind !== "speaking" ? `<div class="wrong"><h4>Səhv dediklərin</h4><ul>${it.wrong.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
               ${it.speech ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
-              ${it.corrected ? `<div class="corrected"><h4>Necə deməli idin <span class="muted small">(sənin cavabın, bütün səhvlər düzəldilmiş)</span></h4><div class="ref">${md(it.corrected)}</div></div>` : ""}
+              ${betterBlock(it, q)}
+              ${it.corrected ? (it.better
+                ? `<details><summary>Yalnız səhvlərin düzəldilmiş variantı (heç nə əlavə olunmayıb)</summary><div class="corrected" style="margin-top:8px"><div class="ref">${md(it.corrected)}</div></div></details>`
+                : `<div class="corrected"><h4>Necə deməli idin <span class="muted small">(sənin cavabın, bütün səhvlər düzəldilmiş)</span></h4><div class="ref">${md(it.corrected)}</div></div>`) : ""}
+              ${coachBlock(it, q)}
               <details><summary>Sənin cavabın (mətn)</summary><div class="transcript">${esc(it.transcript || "—")}</div></details>
               ${q.kind === "speaking" ? sampleBlock(q) : `<details><summary>Etalon cavab (${SRC_LONG[q.src]})</summary>${refBody(q)}</details>`}
             </article>`;
           }).join("")}
-          <div class="row">
+          <div class="row cta">
             <button class="btn accent" id="again">Yeni bilet çək</button>
             <button class="btn ghost" id="home">Ana səhifə</button>
           </div>
@@ -958,7 +990,7 @@
               <option value="weak" ${s.mode === "weak" ? "selected" : ""}>Zəif və cavablanmamış suallara üstünlük</option>
             </select>
           </label>
-          <div class="row"><button class="btn" id="save">Yadda saxla</button></div>
+          <div class="row cta"><button class="btn" id="save">Yadda saxla</button></div>
         </section>`;
       bindKeyForm();
       $app.querySelector("#save").onclick = () => {
