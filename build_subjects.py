@@ -242,7 +242,32 @@ def build_riyazi():
     }
 
 
-SUBJECTS = [build_adiak(), build_fizika(), build_xdiak(), build_python(), build_riyazi()]
+# ---------------------------------------------------------------- Xətti cəbr
+def build_xetti():
+    """Rəsmi fayl: "Xətti Cəbr (Kollokvium-da düşəcək nəzəri suallar)", 10 nəzəri sual. Müəllim (Əmirova R.A.) yalnız
+    nəzəri sual veriləcəyini dedi, misal yoxdur. Etalonlar mühazirə slaydlarının (M01–M07) terminləri ilə yazılıb,
+    hər birinin sonunda "Sadə dillə" izahı var (müəllimin özünün "komanda" bənzətmələri üslubunda)."""
+    d = docx.Document(KOL / "xetti cebr kollek suallari.docx")
+    items = {}
+    for p in d.paragraphs:
+        m = re.match(r"^(\d+)\.\s*(.+)$", clean(p.text))
+        if m:
+            items[int(m.group(1))] = m.group(2)
+    assert sorted(items) == list(range(1, 11)), sorted(items)
+    txt = (HERE / "content" / "xetti-nezeri.txt").read_text(encoding="utf-8")
+    ans = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"(?ms)^### (\d+)\n(.*?)(?=^### |\Z)", txt)}
+    assert sorted(ans) == list(range(1, 11)), sorted(ans)
+    group = lambda i: "a" if i <= 4 else ("b" if i <= 7 else "c")
+    qs = [{"n": i, "q": items[i], "kind": "theory", "group": group(i), "src": "muhazire", "answer": ans[i]} for i in range(1, 11)]
+    return {
+        "id": "xetti", "short": "Xətti cəbr", "name": "Xətti cəbr: matrislər, determinantlar, XCTS",
+        "exam": "Kollokvium", "lang": "az", "answer": "text", "ticket": ["a", "b", "c"],
+        "ticketNote": "10 nəzəri sualdan 3-ü düşür: hər bölmədən bir sual (matris və determinant · minor, tərs matris, ranq · xətti asılılıq və XCTS). Təxmini tərtibdir, real biletdəki sual sayını yoxla. Müəllim misal verməyəcək, yalnız nəzəriyyə.",
+        "questions": qs,
+    }
+
+
+SUBJECTS = [build_adiak(), build_fizika(), build_xdiak(), build_python(), build_riyazi(), build_xetti()]
 for _s in SUBJECTS:
     _s.setdefault("max", 10)  # kollokvium cəmi 10 baldır
 (HERE / "subjects.js").write_text("window.SUBJECTS = " + json.dumps(SUBJECTS, ensure_ascii=False, indent=1) + ";\n", encoding="utf-8")
