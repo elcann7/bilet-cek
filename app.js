@@ -717,7 +717,7 @@
       const s = settings();
       const q = qOf(exam.qs[i]);
       const last = i === exam.qs.length - 1;
-      const hint = { problem: "Məsələni addım-addım həll et: düsturu, əvəzləməni və son cavabı (ölçü vahidi ilə) de.", speaking: levelOf() ? `Cavabı ingilis dilində, uzun və ətraflı ver (2–4 dəqiqə danış və ya bir neçə abzas yaz): fikrini izah et, səbəb və nümunə gətir. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində, uzun və ətraflı ver.", theory: "" }[q.kind] || "";
+      const hint = { problem: "Məsələni addım-addım həll et: qaydanı (düsturu), hər addımı və son cavabı göstər (fiziki kəmiyyətdə ölçü vahidi ilə).", speaking: levelOf() ? `Cavabı ingilis dilində, uzun və ətraflı ver (2–4 dəqiqə danış və ya bir neçə abzas yaz): fikrini izah et, səbəb və nümunə gətir. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində, uzun və ətraflı ver.", theory: "" }[q.kind] || "";
       // yazılı fənn (Xətti cəbr, Fizika...): səs yalnız vaxta qənaətdir, nitq qiymətləndirilmir
       const writtenNote = S().oral === false && q.kind !== "speaking" ? "Real kollokvium yazılıdır: səslə cavab yalnız vaxta qənaət üçündür, nitq qiymətləndirilmir, yalnız məzmun. Düsturları sözlə de (məs. «a bir-bir vur a iki-iki çıx…», «det A sıfır deyil»)." : "";
       $app.innerHTML = `

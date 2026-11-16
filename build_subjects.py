@@ -244,8 +244,9 @@ def build_riyazi():
 
 # ---------------------------------------------------------------- Xətti cəbr
 def build_xetti():
-    """Rəsmi fayl: "Xətti Cəbr (Kollokvium-da düşəcək nəzəri suallar)", 10 nəzəri sual. Müəllim (Əmirova R.A.) yalnız
-    nəzəri sual veriləcəyini dedi, misal yoxdur. Etalonlar mühazirə slaydlarının (M01–M07) terminləri ilə yazılıb,
+    """Kollokvium 30 sualdır: 10 nəzəri (rəsmi fayl "Xətti Cəbr (Kollokvium-da düşəcək nəzəri suallar)") + 20 misal.
+    Müəllim misalların siyahısını verməyib: 20 misal eyni tiplərdə content/make_xetti_misallar.py ilə yaradılıb
+    (addım-addım həll, bütün ədədlər kodla yoxlanılıb). Etalonlar mühazirə slaydlarının (M01–M07) terminləri ilə yazılıb,
     hər birinin sonunda "Sadə dillə" izahı var (müəllimin özünün "komanda" bənzətmələri üslubunda)."""
     d = docx.Document(KOL / "xetti cebr kollek suallari.docx")
     items = {}
@@ -257,12 +258,14 @@ def build_xetti():
     txt = (HERE / "content" / "xetti-nezeri.txt").read_text(encoding="utf-8")
     ans = {int(m.group(1)): m.group(2).strip() for m in re.finditer(r"(?ms)^### (\d+)\n(.*?)(?=^### |\Z)", txt)}
     assert sorted(ans) == list(range(1, 11)), sorted(ans)
-    group = lambda i: "a" if i <= 4 else ("b" if i <= 7 else "c")
-    qs = [{"n": i, "q": items[i], "kind": "theory", "group": group(i), "src": "muhazire", "answer": ans[i]} for i in range(1, 11)]
+    qs = [{"n": i, "q": items[i], "kind": "theory", "group": "a", "src": "muhazire", "answer": ans[i]} for i in range(1, 11)]
+    tasks = json.loads((HERE / "content" / "xetti-misallar.json").read_text(encoding="utf-8"))
+    assert [t["n"] for t in tasks] == list(range(11, 31)), [t["n"] for t in tasks]
+    qs += [{"n": t["n"], "q": t["q"], "kind": "problem", "group": "p", "src": "hesab", "answer": t["answer"]} for t in tasks]
     return {
         "id": "xetti", "short": "Xətti cəbr", "name": "Xətti cəbr: matrislər, determinantlar, XCTS",
-        "exam": "Kollokvium", "lang": "az", "answer": "voice", "ticket": ["a", "b", "c"],
-        "ticketNote": "10 nəzəri sualdan 3-ü düşür: hər bölmədən bir sual (matris və determinant · minor, tərs matris, ranq · xətti asılılıq və XCTS). Təxmini tərtibdir, real biletdəki sual sayını yoxla. Müəllim misal verməyəcək, yalnız nəzəriyyə.",
+        "exam": "Kollokvium", "lang": "az", "answer": "voice", "ticket": ["a", "p", "p"],
+        "ticketNote": "30 sualdan 3-ü düşür: 1 nəzəri sual və 2 misal (10 nəzəri, 20 misal). Təxmini tərtibdir, real biletin tərtibini yoxla. Nəzəri suallar rəsmi siyahıdandır; misalların rəsmi siyahısı verilməyib, onlar eyni tiplərdə hazırlanıb və addım-addım həlli var.",
         "questions": qs,
     }
 
