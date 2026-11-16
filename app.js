@@ -122,7 +122,7 @@
   };
   const saveCustom = (list) => { store.set("custom", list); return JSON.stringify(store.get("custom", null)) === JSON.stringify(list); };
   loadCustom();
-  const ctxOf = (q) => btoa(unescape(encodeURIComponent(JSON.stringify({ name: S().name, lang: S().lang, kind: q.kind, n: q.n, q: q.q.slice(0, 1500), answer: (q.answer || "").slice(0, 3500) }))));
+  const ctxOf = (q) => btoa(unescape(encodeURIComponent(JSON.stringify({ name: S().name, lang: S().lang, oral: S().answer !== "text", kind: q.kind, n: q.n, q: q.q.slice(0, 1500), answer: (q.answer || "").slice(0, 3500) }))));
   const apiExtra = (q) => (S().custom ? { "x-ctx": ctxOf(q) } : undefined);   // öz fənnində sual sorğu ilə gedir
 
   // fayldan mətn: .txt/.md birbaşa, .docx və .pdf brauzerdə oxunur (kitabxanalar yalnız lazım olanda yüklənir)
@@ -616,7 +616,7 @@
             <ol class="steps">
               <li>Bilet çəkirsən. ${esc(sub.ticketNote)}</li>
               <li>${s.prep ? `${mmss(s.prep)} dəqiqə hazırlaşırsan.` : "Hazırlıq olmadan birbaşa başlayırsan."}</li>
-              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : `Hər suala ayrıca danışırsan (${limitFor(s) ? `ən çox ${mmss(limitFor(s))}` : "vaxt limiti yoxdur"}). İstəsən, yazılı da cavab verə bilərsən.`}</li>
+              <li>${sub.answer === "text" ? "Hər suala yazılı cavab verirsən. İstəsən, səslə də cavab verə bilərsən." : (sub.oral === false ? `Hər suala səslə cavab verirsən: vaxta qənaət üçün. Real kollokvium yazılıdır, ona görə nitq yox, yalnız məzmun yoxlanılır. İstəsən, yazılı da cavab verə bilərsən.` : `Hər suala ayrıca danışırsan (${limitFor(s) ? `ən çox ${mmss(limitFor(s))}` : "vaxt limiti yoxdur"}). İstəsən, yazılı da cavab verə bilərsən.`)}</li>
               <li>${sub.questions.some((q) => q.kind === "speaking") ? `Süni intellekt nitqini mətnə çevirir, ingilis dili meyarları ilə yoxlayır və ${maxOf()} ballıq bal verir.` : `Süni intellekt cavabını etalonla müqayisə edir və ${maxOf()} ballıq kollokvium balı verir.`}</li>
             </ol>
             ${sub.sets ? `
@@ -718,6 +718,8 @@
       const q = qOf(exam.qs[i]);
       const last = i === exam.qs.length - 1;
       const hint = { problem: "Məsələni addım-addım həll et: düsturu, əvəzləməni və son cavabı (ölçü vahidi ilə) de.", speaking: levelOf() ? `Cavabı ingilis dilində, uzun və ətraflı ver (2–4 dəqiqə danış və ya bir neçə abzas yaz): fikrini izah et, səbəb və nümunə gətir. Səviyyənə uyğun sadə və aydın cümlələrlə danış (${levelOf().label}); ağır sözlər lazım deyil, amma səhvlər sayılacaq.` : "Cavabı ingilis dilində, uzun və ətraflı ver.", theory: "" }[q.kind] || "";
+      // yazılı fənn (Xətti cəbr, Fizika...): səs yalnız vaxta qənaətdir, nitq qiymətləndirilmir
+      const writtenNote = S().oral === false && q.kind !== "speaking" ? "Real kollokvium yazılıdır: səslə cavab yalnız vaxta qənaət üçündür, nitq qiymətləndirilmir, yalnız məzmun. Düsturları sözlə de (məs. «a bir-bir vur a iki-iki çıx…», «det A sıfır deyil»)." : "";
       $app.innerHTML = `
         <section class="fade-in stack">
           ${paper(i)}
@@ -727,6 +729,7 @@
               <button class="link" id="mode-toggle"></button>
             </div>
             ${hint ? `<p class="muted small" style="margin:0">${hint}</p>` : ""}
+            ${writtenNote ? `<p class="muted small written-note" style="margin:0">${writtenNote}</p>` : ""}
             <div id="rec-body"></div>
           </div>
           <div class="row cta answer-actions" style="justify-content:space-between">
@@ -905,7 +908,7 @@
                 <div class="miss"><h4>${q.kind === "speaking" ? "Səhvlər və düzəlişlər" : "Çatışmayanlar"}</h4><ul>${(it.missed || []).map((x) => `<li>${esc(x)}</li>`).join("") || "<li class='muted'>—</li>"}</ul></div>
               </div>
               ${(it.wrong || []).length && q.kind !== "speaking" ? `<div class="wrong"><h4>Səhv dediklərin</h4><ul>${it.wrong.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
-              ${it.speech ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
+              ${it.speech && S().oral !== false ? `<p class="small muted" style="margin:0"><b>Nitq:</b> ${esc(it.speech)}</p>` : ""}
               ${betterBlock(it, q)}
               ${it.corrected ? (it.better
                 ? `<details><summary>Yalnız səhvlərin düzəldilmiş variantı (heç nə əlavə olunmayıb)</summary><div class="corrected" style="margin-top:8px"><div class="ref">${md(it.corrected)}</div></div></details>`

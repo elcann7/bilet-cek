@@ -38,7 +38,8 @@ const SRC_LABEL = {
 };
 const LANG_NAME = { az: "Azərbaycan", en: "ingilis", ru: "rus", tr: "türk" };
 
-const OUT_RULES = (kind) => `transcript: ${kind === "audio" ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : kind === "spoken" ? "Aşağıdakı mətn tələbənin ŞİFAHİ cavabının avtomatik, sözbəsöz yazısıdır (uzun səs yazısı hissə-hissə mətnə çevrilib). Onu olduğu kimi qaytar." : "Tələbənin mətnini olduğu kimi qaytar."}`;
+const WRITTEN_TRANSCRIPT = "Səs yazısını mətnə çevir. Bu fənnin real imtahanı yazılıdır, tələbə yalnız vaxta qənaət üçün danışıb: düsturları və riyazi ifadələri riyazi yazılışla yaz (məs. a₁₁a₂₂ − a₁₂a₂₁, det A ≠ 0, A⁻¹, (A | B)), parazit sözləri (ee, yəni, şey) at. Məzmunu dəyişmə: tələbənin səhv dediyini səhv olaraq saxla, heç nə əlavə etmə və tamamlama. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et.";
+const OUT_RULES = (kind, oral = true) => `transcript: ${kind === "audio" ? (oral ? "Səs yazısını olduğu kimi, sözbəsöz mətnə çevir. Eşitmədiyin heç nəyi əlavə etmə və düzəltmə. Yazı boşdursa və ya anlaşılmırsa, bunu qeyd et." : WRITTEN_TRANSCRIPT) : kind === "spoken" ? "Aşağıdakı mətn tələbənin ŞİFAHİ cavabının avtomatik, sözbəsöz yazısıdır (uzun səs yazısı hissə-hissə mətnə çevrilib). Onu olduğu kimi qaytar." : "Tələbənin mətnini olduğu kimi qaytar."}`;
 
 // Sual növünə görə prompt: nəzəri sual, məsələ, ingilis dilində speaking
 // Qrupun müəllimi qrammatika mövzularını verirsə, şifahi cavabda məhz onlar yoxlanır
@@ -72,8 +73,13 @@ Do this:
 Write covered/missed/feedback/speech/why/plan/steps in Azerbaijani; keep quoted English and the "corrected" and "better" texts as English.`;
   }
   const problem = q.kind === "problem";
+  const oral = subj.oral !== false;   // ADİAK, XDİAK: şifahi; Xətti cəbr, Fizika, Python, Riyazi: real imtahan yazılıdır
+  const voiced = kind !== "text";
+  const writtenNote = !oral && voiced ? `
+
+VACİB: bu fənnin real kollokviumu YAZILIDIR (vərəqdə). Tələbə saytda vaxta qənaət üçün cavabı SƏSLƏ deyib. Ona görə nitq, tələffüz, parazit sözlər, danışıq üslubu və cümlə quruluşu QİYMƏTLƏNDİRİLMİR və rəydə xatırlanmır: yalnız MƏZMUN (anlayışlar, təriflər, düsturlar, şərtlər, addımlar) yoxlanılır. Səslə deyilən düsturları riyazi yazılışa çevirib anla (məs. "a bir bir vur a iki iki çıx a bir iki vur a iki bir" = a₁₁a₂₂ − a₁₂a₂₁; "a tərsi" = A⁻¹; "det A sıfır deyil" = det A ≠ 0) və düzgündürsə, tam say.` : "";
   const langNote = subj.lang && subj.lang !== "az" && LANG_NAME[subj.lang] ? ` Tələbə ${LANG_NAME[subj.lang]} dilində cavab verir; səs yazısını həmin dildə mətnə çevir.` : "";
-  return `Sən ${subj.custom ? "bir universitetdə" : "Azərbaycan Texniki Universitetində"} "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.${langNote}
+  return `Sən ${subj.custom ? "bir universitetdə" : "Azərbaycan Texniki Universitetində"} "${subj.name}" fənnindən ${problem ? "kollokvium (məsələ hissəsi)" : "kollokvium"} qəbul edən müəllimsən. Tələbə biletdəki ${problem ? "məsələyə" : "suala"} ${how} cavab verib.${langNote}${writtenNote}
 
 ${problem ? "MƏSƏLƏ" : "SUAL"} №${q.n}: ${q.q}
 
@@ -83,21 +89,21 @@ ${q.answer}
 """` : `ETALON CAVAB VERİLMƏYİB. Cavabı öz fənn biliyinə görə qiymətləndir: yalnız əmin olduğun faktiki səhvləri "missed"-ə yaz. Əmin olmadığın yerdə bunu rəydə qeyd et və balı ehtiyatla ver.`}
 
 Tapşırıq:
-1. ${OUT_RULES(kind)}
+1. ${OUT_RULES(kind, oral)}
 2. ${problem
     ? "Tələbənin həllini yoxla: düzgün düstur seçib, ədədləri düz əvəz edib və son cavabı (ölçü vahidi ilə) düz tapıbmı. Şifahi danışıqda ədədlərin eşidilməsi çətin ola bilər, əvəzetməni məntiqə görə yoxla. Son cavab düzdürsə, lakin həll yolu aydın deyilsə, balı bir az azalt. Cavab səhvdirsə, ara addımlara görə qismən bal ver və səhvin harada olduğunu göstər."
     : "Cavabı etalonla müqayisə et. Etalon yalnız istiqamətdir: tələbə öz sözləri ilə, başqa düzgün misallarla danışa bilər; mənaca doğru olan hər fikri say. Sual bir neçə hissədən ibarətdirsə, hər hissənin cavablandırılıb-cavablandırılmadığını yoxla. Faktiki səhvləri \"missed\" bölməsində qeyd et."}
 3. score (0–10): 9–10 = ${problem ? "düzgün həll və düzgün cavab" : "əsas fikirlərin demək olar hamısı, məntiqi ardıcıllıq və terminlərlə"}; 7–8 = ${problem ? "yol düzdür, kiçik hesab və ya vahid səhvi" : "əsas fikirlər var, bir-iki boşluq"}; 5–6 = ${problem ? "yolun yarısı düzdür" : "mövzunun yarısı, səthi"}; 3–4 = ${problem ? "düstur var, həll yarımçıq" : "bir neçə doğru fikir"}; 1–2 = çox az və ya ümumi sözlər; 0 = cavab yoxdur və ya mövzudan kənardır. Ədalətli ol, amma uzun danışmağı məzmun kimi qiymətləndirmə.
 4. covered: tələbənin düzgün dediyi əsas fikirlər${problem ? " və ya düzgün addımlar" : ""} (hər biri qısa ifadə). missed: ${problem ? "səhv və ya buraxılmış addımlar" : "etalonda olub deyilməyən ən vacib fikirlər"} (ən çox 5, qısa).
 5. feedback: tələbəyə "sən" deyə müraciət edən 2–3 cümləlik konkret rəy: nə yaxşı idi, balı artırmaq üçün nə əlavə etməli idi.
-6. speech: ${kind !== "text" ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
+6. speech: ${!oral ? "boş mətn qaytar (bu fənndə nitq qiymətləndirilmir)." : voiced ? "nitq mədəniyyəti barədə 1 cümlə (ardıcıllıq, parazit sözlər, terminlərin işlənməsi, ədəbi dil normaları)." : "yazı mədəniyyəti barədə 1 cümlə."}
 7. why: TƏK cümlə: niyə məhz bu bal və niyə daha yüksək deyil (hansı hissə tam idi, hansı yarımçıq və ya səhv). Məs.: "Tərifi və iki növü düz dedin, amma üçüncü növü və nümunəni buraxdın, buna görə 6."
 8. wrong: tələbənin ${problem ? "həllində" : "cavabında"} SƏHV dediyi konkret fikirlər${problem ? ", düsturlar və ya hesablamalar" : ""}, hər biri "dedin: … → düzgünü: …" formasında (tələbənin sözlərini qısa sitat gətir). "missed"-dən fərqlidir: missed = deyilməyənlər, wrong = səhv deyilənlər. Səhv yoxdursa, boş siyahı.
 9. better: "Sənin cavabın necə olsaydı 10 bal alardı". ${problem
     ? "Tələbənin həllini əsas götürərək TAM həlli addım-addım yaz: verilənlər, düstur və ya alqoritm, əvəzləmə və ya kod, hesablama, son cavab (fiziki kəmiyyətdə ölçü vahidi ilə). Tələbənin düzgün addımlarını öz sözləri ilə saxla; əlavə etdiyin və düzəltdiyin addımları **qoşa ulduz** içində yaz."
-    : "Tələbənin ÖZ cavabını əsas götür: onun düzgün cümlələrini və fikir ardıcıllığını saxla (yalnız danışıq qüsurlarını, təkrarları və parazit sözləri təmizlə), səhv fikirləri düzəlt, çatışmayan vacib fikirləri məntiqi yerinə əlavə et. Əlavə etdiyin və düzəltdiyin HƏR hissəni **qoşa ulduz** içində yaz (yalnız bir cümlə daxilində, abzaslar arası yox) ki, tələbə fərqi görsün; tələbənin öz düzgün sözlərini işarələmə."} Bu, kollokviumda ${how} deyilə biləcək təbii üslubda olsun: ${problem ? "aydın və yığcam" : "giriş cümləsi, əsas hissə (terminlərlə, lazım olsa bir misal), qısa yekun; təxminən 120–220 söz"}. ${q.answer ? "Etalonda olmayan uydurma fakt əlavə etmə." : "Yalnız əmin olduğun faktları yaz."} Kod lazımdırsa, \`\`\` bloku içində yaz. Abzasları boş sətirlə ayır. Tələbə heç nə deməyibsə (transcript boşdur), ** işarəsiz tam nümunə cavab yaz.
+    : "Tələbənin ÖZ cavabını əsas götür: onun düzgün cümlələrini və fikir ardıcıllığını saxla (yalnız danışıq qüsurlarını, təkrarları və parazit sözləri təmizlə), səhv fikirləri düzəlt, çatışmayan vacib fikirləri məntiqi yerinə əlavə et. Əlavə etdiyin və düzəltdiyin HƏR hissəni **qoşa ulduz** içində yaz (yalnız bir cümlə daxilində, abzaslar arası yox) ki, tələbə fərqi görsün; tələbənin öz düzgün sözlərini işarələmə."} ${oral ? `Bu, kollokviumda ${how} deyilə biləcək təbii üslubda olsun: ${problem ? "aydın və yığcam" : "giriş cümləsi, əsas hissə (terminlərlə, lazım olsa bir misal), qısa yekun; təxminən 120–220 söz"}.` : `Bu, kollokvium VƏRƏQİNDƏ yazılacaq formada olsun: danışıq dili yox, yığcam yazılı cavab; tərif, şərtlər və düsturlar riyazi yazılışla (a₁₁, det A, A⁻¹, ≠, ⇔), lazım olduqda bəndlərlə; təxminən 100–200 söz. Tələbənin danışıq cümlələrini yazılı dilə çevir; bu üslub dəyişikliyini qalın yazma, yalnız məzmun əlavələrini və düzəlişləri qalın yaz.`} ${q.answer ? "Etalonda olmayan uydurma fakt əlavə etmə." : "Yalnız əmin olduğun faktları yaz."} Kod lazımdırsa, \`\`\` bloku içində yaz. Abzasları boş sətirlə ayır. Tələbə heç nə deməyibsə (transcript boşdur), ** işarəsiz tam nümunə cavab yaz.
 10. plan: ${problem ? "bu məsələnin həll alqoritmi: 3–6 qısa addım (məs. \"Verilənləri SI vahidinə çevir\")" : "ideal cavabın skeleti: 3–6 qısa bənd, yadda saxlamaq üçün (məs. \"Tərif\", \"Üç növü və fərqləri\", \"Gündəlik həyatdan misal\")"}.
-11. steps: bu tələbənin konkret səhvlərinə əsaslanan 2–3 aydın addım: növbəti dəfə balı artırmaq üçün nə etməli (ümumi məsləhət yox).
+11. steps: bu tələbənin konkret səhvlərinə əsaslanan 2–3 aydın addım: növbəti dəfə balı artırmaq üçün nə etməli (ümumi məsləhət yox${oral ? "" : "; nitq və danışıq barədə məsləhət vermə, yalnız məzmun"}).
 Bütün mətnlər Azərbaycan dilində olsun.`;
 };
 
@@ -176,7 +182,7 @@ function fromCtx(request) {
   if (!c || typeof c.q !== "string" || !c.q.trim()) return null;
   const kind = ["theory", "problem", "speaking"].includes(c.kind) ? c.kind : "theory";
   return {
-    subj: { custom: true, short: "Custom", name: String(c.name || "Fənn").slice(0, 120), lang: String(c.lang || "az").slice(0, 3), levels: (DATA.xdiak && DATA.xdiak.levels) || [], sets: [] },
+    subj: { custom: true, short: "Custom", name: String(c.name || "Fənn").slice(0, 120), lang: String(c.lang || "az").slice(0, 3), oral: c.oral !== false, levels: (DATA.xdiak && DATA.xdiak.levels) || [], sets: [] },
     q: { n: Number(c.n) || 1, q: c.q.slice(0, 1500), kind, src: c.answer ? "user" : "umumi", answer: String(c.answer || "").slice(0, 4000) },
   };
 }
@@ -280,7 +286,7 @@ export async function POST(request) {
     const lang = q.kind === "speaking" ? "English" : (LANG_NAME[subj.lang] ? `${LANG_NAME[subj.lang]} dili` : "Azərbaycan dili");
     const prompt = `Bu, universitet tələbəsinin "${subj.name}" fənnindən şifahi cavabının səs yazısının ${part}-ci hissəsidir (cəmi ${of} hissə). Sual: ${q.q}
 
-Səsi ${lang} ilə SÖZBƏSÖZ mətnə çevir: tələbənin dediyini olduğu kimi yaz, qrammatik və leksik səhvləri DÜZƏLTMƏ, heç nə əlavə etmə və tamamlama, parazit sözləri (yəni, şey, ee, um) saxla. Anlaşılmayan söz üçün [anlaşılmır] yaz. Hissə cümlənin ortasında başlaya və ya bitə bilər: onu olduğu kimi saxla. Səs boşdursa, boş mətn qaytar.`;
+${subj.oral === false && q.kind !== "speaking" ? `Səsi ${lang} ilə mətnə çevir. Bu fənnin real imtahanı yazılıdır, tələbə yalnız vaxta qənaət üçün danışır: düsturları riyazi yazılışla yaz (a₁₁, det A ≠ 0, A⁻¹), parazit sözləri at, amma məzmunu dəyişmə və heç nə əlavə etmə.` : `Səsi ${lang} ilə SÖZBƏSÖZ mətnə çevir: tələbənin dediyini olduğu kimi yaz, qrammatik və leksik səhvləri DÜZƏLTMƏ, heç nə əlavə etmə və tamamlama, parazit sözləri (yəni, şey, ee, um) saxla.`} Anlaşılmayan söz üçün [anlaşılmır] yaz. Hissə cümlənin ortasında başlaya və ya bitə bilər: onu olduğu kimi saxla. Səs boşdursa, boş mətn qaytar.`;
     const r = await callGemini(key, [{ text: prompt }, { inline_data: { mime_type: "audio/wav", data: raw.toString("base64") } }], { type: "object", properties: { transcript: { type: "string" } }, required: ["transcript"] }, 0);
     return r.ok ? json(200, { transcript: String(r.ok.transcript || "").trim() }) : json(r.status, { error: r.error });
   }

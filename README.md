@@ -49,7 +49,9 @@ flowchart LR
 | **XDİAK** (ingilis dili) | 25 speaking mövzusu | səslə (yazılı da olar) | qrupun **səviyyəsinə** görə: Elementary-dən Upper-Intermediate-ə; leksik və qrammatik səhvlər sayılır, səviyyədən yuxarı söz tələb olunmur |
 | **Proqramlaşdırma** (Python) | 20 nəzəri mövzu + 10 kod izləmə tapşırığı | yazılı | nəzəriyyədə etalonla, tapşırıqda çıxışın düzgünlüyü ilə |
 | **Riyazi analiz** | 10 nəzəri sual + 20 çalışma | yazılı | nəzəriyyədə etalonla, çalışmada həll və cavabla |
-| **Xətti cəbr** | 10 nəzəri sual (rəsmi siyahı; müəllim misal vermir) | yazılı (səslə də olar) | etalonla; hər etalonun sonunda "Sadə dillə" izahı |
+| **Xətti cəbr** | 10 nəzəri sual (rəsmi siyahı; müəllim misal vermir) | səslə (vaxta qənaət üçün; real kollokvium yazılıdır) | yalnız məzmun, nitq qiymətləndirilmir; hər etalonun sonunda "Sadə dillə" izahı |
+
+**Şifahi və yazılı fənlər:** nitq yalnız ADİAK və XDİAK-da qiymətləndirilir. Real imtahanı vərəqdə yazılan fənlərdə (Xətti cəbr, Fizika, Python, Riyazi analiz) səslə cavab yalnız vaxta qənaətdir: səs düsturlarla mətnə çevrilir, yalnız məzmun yoxlanılır və "10 ballıq cavab" vərəqdə yazılacaq formada verilir.
 
 Yeni hazır fənn əlavə etmək `build_subjects.py`-də bir funksiya yazmaq deməkdir.
 

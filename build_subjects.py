@@ -261,7 +261,7 @@ def build_xetti():
     qs = [{"n": i, "q": items[i], "kind": "theory", "group": group(i), "src": "muhazire", "answer": ans[i]} for i in range(1, 11)]
     return {
         "id": "xetti", "short": "Xətti cəbr", "name": "Xətti cəbr: matrislər, determinantlar, XCTS",
-        "exam": "Kollokvium", "lang": "az", "answer": "text", "ticket": ["a", "b", "c"],
+        "exam": "Kollokvium", "lang": "az", "answer": "voice", "ticket": ["a", "b", "c"],
         "ticketNote": "10 nəzəri sualdan 3-ü düşür: hər bölmədən bir sual (matris və determinant · minor, tərs matris, ranq · xətti asılılıq və XCTS). Təxmini tərtibdir, real biletdəki sual sayını yoxla. Müəllim misal verməyəcək, yalnız nəzəriyyə.",
         "questions": qs,
     }
@@ -270,10 +270,12 @@ def build_xetti():
 SUBJECTS = [build_adiak(), build_fizika(), build_xdiak(), build_python(), build_riyazi(), build_xetti()]
 for _s in SUBJECTS:
     _s.setdefault("max", 10)  # kollokvium cəmi 10 baldır
+    # şifahi fənlər: nitq qiymətləndirilir. Qalanlarında real kollokvium vərəqdə yazılır, saytda səs yalnız vaxta qənaətdir
+    _s.setdefault("oral", _s["id"] in ("adiak", "xdiak"))
 (HERE / "subjects.js").write_text("window.SUBJECTS = " + json.dumps(SUBJECTS, ensure_ascii=False, indent=1) + ";\n", encoding="utf-8")
 api = HERE / "api"
 api.mkdir(exist_ok=True)
-slim = {s["id"]: {"short": s["short"], "name": s["name"], "lang": s["lang"], "levels": s.get("levels", []), "sets": [{"id": x["id"], "grammar": x.get("grammar", [])} for x in s.get("sets", [])], "q": {q["n"]: {k: q[k] for k in ("n", "q", "kind", "src", "answer")} for q in s["questions"]}} for s in SUBJECTS}
+slim = {s["id"]: {"short": s["short"], "name": s["name"], "lang": s["lang"], "oral": s["oral"], "levels": s.get("levels", []), "sets": [{"id": x["id"], "grammar": x.get("grammar", [])} for x in s.get("sets", [])], "q": {q["n"]: {k: q[k] for k in ("n", "q", "kind", "src", "answer")} for q in s["questions"]}} for s in SUBJECTS}
 (api / "_data.js").write_text("export default " + json.dumps(slim, ensure_ascii=False) + ";\n", encoding="utf-8")
 for s in SUBJECTS:
     print(s["id"], len(s["questions"]), "sual", {k: sum(1 for q in s["questions"] if q["src"] == k) for k in {q["src"] for q in s["questions"]}})
