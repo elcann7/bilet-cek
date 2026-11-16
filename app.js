@@ -164,9 +164,12 @@
     ? `<pre class="code">${seg.replace(/\n$/, "")}</pre>`
     : inl(seg).split(/\n{2,}/).filter((p) => p.trim()).map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("")).join("");
   // sual mətni: kod blokları varsa <pre>, qalanı sətir qırılması ilə
+  // vergüldən sonra boşluq olmayan uzun siyahılar ("find,rfind,index,...") telefonda sətrə sığmırdı:
+  // vergül, nöqtəli vergül və sləşdən sonra görünməz qırılma nöqtəsi (<wbr>) qoyulur. Kod bloklarına toxunulmur.
+  const wbr = (h) => h.replace(/([,;/])(?=[^\s<])/g, "$1<wbr>");
   const qh = (s) => esc(s).split(CODE).map((seg, i) => i % 2
     ? `<pre class="code">${seg.replace(/\n$/, "")}</pre>`
-    : inl(seg).replace(/\n/g, "<br>")).join("");
+    : wbr(inl(seg)).replace(/\n/g, "<br>")).join("");
   // etalon cavabın göstərilməsi: səhifə şəkilləri varsa (fizikada düsturlar), onlar; yoxsa mətn
   const refBody = (q) => !q.answer && !(q.images && q.images.length)
     ? `<div class="ref"><p class="muted small">Bu sual üçün etalon cavab yüklənməyib: qiymətləndirmə süni intellektin öz fənn biliyinə əsaslanır. Redaktədə etalon cavab əlavə edə bilərsən.</p></div>`

@@ -24,7 +24,11 @@ body {
   font: 16px/1.55 var(--sans);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  overflow-wrap: break-word;
 }
+/* uzun sözlər (bitişik siyahılar, düsturlar, linklər) çərçivədən çıxmasın, sətrə bölünsün */
+.qtext, .qh3, .bank-item summary > span, .ref, .transcript, .cols li, .wrong li, .coach li, .why, .hist > div { overflow-wrap: anywhere; }
+pre.code { max-width: 100%; }
 button { font: inherit; color: inherit; cursor: pointer; }
 h1, h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.2; margin: 0 0 .5em; }
 h1 { font-size: clamp(28px, 5vw, 40px); letter-spacing: -.01em; }
